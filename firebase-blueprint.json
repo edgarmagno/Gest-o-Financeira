@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "User": {
+      "path": "users/{userId}",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Product": {
+      "path": "users/{userId}/products/{productId}",
+      "fields": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "barcode": { "type": "string" },
+        "category": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "salePrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "unit": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Sale": {
+      "path": "users/{userId}/sales/{saleId}",
+      "fields": {
+        "code": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
+        "costTotal": { "type": "number" },
+        "profit": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Customer": {
+      "path": "users/{userId}/customers/{customerId}",
+      "fields": {
+        "name": { "type": "string" },
+        "document": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "totalSpent": { "type": "number" },
+        "ordersCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Quote": {
+      "path": "users/{userId}/quotes/{quoteId}",
+      "fields": {
+        "code": { "type": "string" },
+        "customerName": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "FinancialTransaction": {
+      "path": "users/{userId}/transactions/{transactionId}",
+      "fields": {
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "ProductionOrder": {
+      "path": "users/{userId}/production_orders/{orderId}",
+      "fields": {
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "customerName": { "type": "string" },
+        "items": { "type": "array" },
+        "materials": { "type": "array" },
+        "progressPercent": { "type": "number" },
+        "estimatedCost": { "type": "number" },
+        "totalValue": { "type": "number" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "CompanySettings": {
+      "path": "users/{userId}/settings/company",
+      "fields": {
+        "tradeName": { "type": "string" },
+        "corporateName": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    }
+  }
+}

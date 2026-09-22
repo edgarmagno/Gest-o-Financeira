@@ -1,0 +1,243 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+/* Desativação total de efeitos, animações e transições para máxima velocidade e estabilidade */
+*,
+*::before,
+*::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Remove custo de composição e filtros de desfoque */
+.backdrop-blur-xs,
+.backdrop-blur-sm,
+.backdrop-blur-md,
+.backdrop-blur-lg,
+.backdrop-blur-xl,
+.backdrop-blur-2xl,
+.backdrop-blur-3xl {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ==========================================================================
+   Modo Noturno Global (Dark Theme Engine)
+   Garante escurecimento completo e automático de todos os painéis, tabelas,
+   cartões, formulários, modais e textos.
+   ========================================================================== */
+
+html.dark,
+body.dark {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+  color-scheme: dark;
+}
+
+.dark .bg-\[\#F8FAFC\],
+.dark .bg-slate-100\/50,
+.dark .bg-slate-100\/70,
+.dark .bg-slate-100\/80 {
+  background-color: #0b0f19 !important;
+}
+
+.dark .bg-white {
+  background-color: #131b2e !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/40,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/60,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-100 {
+  background-color: #1c263c !important;
+}
+
+.dark .bg-slate-200 {
+  background-color: #273652 !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-200\/60,
+.dark .border-slate-200\/80,
+.dark .border-slate-300 {
+  border-color: #233148 !important;
+}
+
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #233148 !important;
+}
+
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Inputs, Selects e Textareas no Modo Noturno */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: #182238 !important;
+  color: #f8fafc !important;
+  border-color: #2a3b57 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Hover em Linhas e Botões */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-100\/80:hover {
+  background-color: #1e2c45 !important;
+}
+
+/* Sombras refinadas para Dark Mode */
+.dark .shadow-xs,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Modais e Overlays */
+.dark .bg-slate-900\/40,
+.dark .bg-slate-900\/60,
+.dark .bg-slate-900\/50,
+.dark .bg-black\/50,
+.dark .bg-black\/60 {
+  background-color: rgba(3, 7, 18, 0.82) !important;
+}
+
+/* Custom Scrollbar Dark */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #233148;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #334460;
+}
+
+/* ==========================================================================
+   Midnight OLED Theme (Preto Profundo / True Black)
+   ========================================================================== */
+html[data-theme="midnight"],
+body[data-theme="midnight"] {
+  background-color: #000000 !important;
+  color: #f4f4f5 !important;
+}
+
+html[data-theme="midnight"] .bg-\[\#F8FAFC\],
+html[data-theme="midnight"] .bg-slate-100\/50,
+html[data-theme="midnight"] .bg-slate-100\/70,
+html[data-theme="midnight"] .bg-slate-100\/80 {
+  background-color: #000000 !important;
+}
+
+html[data-theme="midnight"] .bg-white {
+  background-color: #0d0d11 !important;
+}
+
+html[data-theme="midnight"] .bg-slate-50,
+html[data-theme="midnight"] .bg-slate-50\/40,
+html[data-theme="midnight"] .bg-slate-50\/50,
+html[data-theme="midnight"] .bg-slate-50\/60,
+html[data-theme="midnight"] .bg-slate-50\/80,
+html[data-theme="midnight"] .bg-slate-100 {
+  background-color: #141419 !important;
+}
+
+html[data-theme="midnight"] .border-slate-100,
+html[data-theme="midnight"] .border-slate-200,
+html[data-theme="midnight"] .border-slate-200\/60,
+html[data-theme="midnight"] .border-slate-200\/80,
+html[data-theme="midnight"] .border-slate-300 {
+  border-color: #27272a !important;
+}
+
+html[data-theme="midnight"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="midnight"] select,
+html[data-theme="midnight"] textarea {
+  background-color: #111116 !important;
+  border-color: #27272a !important;
+}
+
+/* ==========================================================================
+   Font Scale Adjustments
+   ========================================================================== */
+html[data-font-scale="compact"] {
+  font-size: 14.5px;
+}
+
+html[data-font-scale="normal"] {
+  font-size: 16px;
+}
+
+html[data-font-scale="large"] {
+  font-size: 17.5px;
+}
+
+/* ==========================================================================
+   Border Radius Adjustments
+   ========================================================================== */
+html[data-radius="straight"] .rounded-xl,
+html[data-radius="straight"] .rounded-lg,
+html[data-radius="straight"] .rounded-2xl,
+html[data-radius="straight"] .rounded-md {
+  border-radius: 2px !important;
+}
+
+html[data-radius="smooth"] .rounded-xl,
+html[data-radius="smooth"] .rounded-2xl {
+  border-radius: 8px !important;
+}
+
+html[data-radius="modern"] .rounded-xl {
+  border-radius: 14px !important;
+}
+
+/* ==========================================================================
+   Layout Density Adjustments
+   ========================================================================== */
+html[data-density="compact"] .p-5 {
+  padding: 0.875rem !important;
+}
+
+html[data-density="compact"] .py-3 {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+html[data-density="compact"] .gap-4 {
+  gap: 0.625rem !important;
+}
+
+

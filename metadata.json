@@ -1,0 +1,8 @@
+{
+  "name": "Gestão Comercial & Financeira PRO",
+  "description": "Sistema completo de gestão para loja de personalizados, controle de estoque, PDV ágil, orçamentos, CRM de clientes, pedidos de personalização e produção ágil, fluxo financeiro de vendas e despesas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
