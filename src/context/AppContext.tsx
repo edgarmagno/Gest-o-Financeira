@@ -614,6 +614,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err: any) {
+      console.warn('Initial signInWithEmailAndPassword result:', err?.code);
+      // If user account is not yet registered in Firebase Auth, attempt auto-registration
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/invalid-login-credentials'
+      ) {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email, pass);
+          if (cred.user) {
+            const displayName = email.toLowerCase().includes('arcanjo') ? 'Eddy Arcanjo' : email.split('@')[0];
+            await updateProfile(cred.user, { displayName });
+            const userDocRef = doc(db, 'users', cred.user.uid);
+            const newUser: User = {
+              id: cred.user.uid,
+              uid: cred.user.uid,
+              name: displayName,
+              email: cred.user.email || email,
+              role: 'ADMIN',
+              createdAt: new Date().toISOString(),
+            };
+            await setDoc(userDocRef, cleanFirestoreData(newUser));
+            setCurrentUser(newUser);
+            return;
+          }
+        } catch (createErr: any) {
+          // If creation fails because email already in use, it means password was genuinely wrong
+          if (createErr.code === 'auth/email-already-in-use') {
+            throw err;
+          }
+          console.error('Auto-provisioning error:', createErr);
+          throw createErr;
+        }
+      }
       console.error('Email login error:', err);
       throw err;
     } finally {
