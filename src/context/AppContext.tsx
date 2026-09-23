@@ -79,7 +79,7 @@ interface AppContextType {
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  loginGuest: () => Promise<void>;
+  loginGuest: (customName?: string) => Promise<void>;
   logout: () => Promise<void>;
   users: User[];
   addUserMember: (member: Omit<User, 'id'>) => Promise<void>;
@@ -691,10 +691,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const loginGuest = async () => {
+  const loginGuest = async (customName?: string) => {
     setIsAuthLoading(true);
     try {
-      await signInAnonymously(auth);
+      const cred = await signInAnonymously(auth);
+      if (cred.user && customName && customName.trim()) {
+        try {
+          await updateProfile(cred.user, { displayName: customName.trim() });
+          const userDocRef = doc(db, 'users', cred.user.uid);
+          await setDoc(
+            userDocRef,
+            cleanFirestoreData({
+              id: cred.user.uid,
+              uid: cred.user.uid,
+              name: customName.trim(),
+              role: 'ADMIN',
+              isAnonymous: true,
+              updatedAt: new Date().toISOString(),
+            }),
+            { merge: true }
+          );
+        } catch {
+          // ignore profile update error
+        }
+      }
     } catch (err: any) {
       console.error('Guest login error:', err);
       throw err;

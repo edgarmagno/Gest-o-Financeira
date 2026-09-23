@@ -1,124 +1,27 @@
 import React, { useState } from 'react';
 import {
-  AlertCircle,
-  CheckCircle2,
   Cloud,
-  Eye,
-  EyeOff,
   Globe,
-  KeyRound,
   Laptop,
-  Lock,
   LogIn,
-  Mail,
   ShieldAlert,
+  ShieldCheck,
   Smartphone,
   Sparkles,
   User,
+  Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const AuthScreen: React.FC = () => {
-  const { loginWithEmail, registerWithEmail, resetPassword, loginWithGoogle, loginGuest } = useApp();
+  const { loginWithGoogle, loginGuest } = useApp();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [customName, setCustomName] = useState('Eddy Arcanjo');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setResetSuccess(null);
-
-    if (!email.trim() || !password.trim()) {
-      setError('Por favor, informe seu e-mail e senha.');
-      return;
-    }
-
-    if (mode === 'register') {
-      if (!name.trim()) {
-        setError('Por favor, informe seu nome completo ou nome da sua empresa.');
-        return;
-      }
-      if (password.length < 6) {
-        setError('A senha deve ter pelo menos 6 caracteres.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('As senhas digitadas não coincidem.');
-        return;
-      }
-    }
-
-    setIsLoading(true);
-    try {
-      if (mode === 'login') {
-        await loginWithEmail(email.trim(), password);
-      } else {
-        await registerWithEmail(email.trim(), password, name.trim());
-      }
-    } catch (err: any) {
-      console.warn('Auth submit feedback:', err?.code || err?.message);
-      if (
-        err.code === 'auth/user-not-found' ||
-        err.code === 'auth/wrong-password' ||
-        err.code === 'auth/invalid-credential' ||
-        err.code === 'auth/invalid-login-credentials'
-      ) {
-        setError(
-          'E-mail ou senha incorretos. Se ainda não cadastrou a senha desta conta ou a esqueceu, clique em "Esqueci minha senha" abaixo para definir sua senha.'
-        );
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('Este e-mail já possui cadastro. Entre com sua senha ou redefina-a.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('A senha é muito fraca. Escolha uma senha com letras e números.');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Formato de e-mail inválido.');
-      } else {
-        setError(err.message || 'Erro ao realizar autenticação.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    setError(null);
-    setResetSuccess(null);
-    if (!email.trim()) {
-      setError('Digite seu e-mail no campo acima antes de clicar em "Esqueci minha senha".');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await resetPassword(email.trim());
-      setResetSuccess(
-        `Enviamos um link de redefinição para ${email.trim()}. Acesse sua caixa de entrada para definir sua senha com segurança.`
-      );
-    } catch (err: any) {
-      console.warn('Reset password error:', err);
-      if (err.code === 'auth/user-not-found') {
-        setError('Nenhum usuário encontrado com este e-mail.');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('E-mail inválido.');
-      } else {
-        setError(err.message || 'Não foi possível enviar o e-mail de redefinição.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGoogleLogin = async () => {
     setError(null);
-    setResetSuccess(null);
     setIsLoading(true);
     try {
       await loginWithGoogle();
@@ -126,23 +29,25 @@ export const AuthScreen: React.FC = () => {
       console.warn('Google login error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
         setError('A janela do Google foi fechada antes de concluir.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('O navegador bloqueou a janela pop-up do Google. Utilize a opção "Entrar Sem Senha" abaixo.');
       } else {
-        setError(err.message || 'Falha ao autenticar com o Google.');
+        setError(err.message || 'Falha ao autenticar com o Google. Use o Acesso Direto abaixo.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGuestLogin = async () => {
+  const handleQuickLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setError(null);
-    setResetSuccess(null);
     setIsLoading(true);
     try {
-      await loginGuest();
+      await loginGuest(customName.trim() || 'Eddy Arcanjo');
     } catch (err: any) {
-      console.warn('Guest login error:', err);
-      setError('Erro ao iniciar acesso anônimo.');
+      console.warn('Quick login error:', err);
+      setError('Erro ao iniciar acesso instantâneo. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +61,7 @@ export const AuthScreen: React.FC = () => {
           <Sparkles className="h-6 w-6 stroke-[2.2]" />
         </div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-          GESTAO PRO
+          GESTÃO PRO
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Loja de Personalizados, Estoque, PDV & Finanças em Nuvem
@@ -166,14 +71,14 @@ export const AuthScreen: React.FC = () => {
       {/* Main Auth Card */}
       <div className="w-full max-w-md rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-850 p-6 sm:p-8 shadow-xl shadow-slate-200/50 dark:shadow-none">
         {/* Value Prop Banner */}
-        <div className="mb-5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-3 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+        <div className="mb-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-3 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
           <div className="flex items-center gap-2">
             <Cloud className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
             <span className="font-medium text-[11px]">Banco em nuvem sincronizado</span>
           </div>
           <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Firestore Conectado
+            Firestore Ativo
           </span>
         </div>
 
@@ -185,169 +90,16 @@ export const AuthScreen: React.FC = () => {
           </div>
         )}
 
-        {/* Reset Password Success Notification */}
-        {resetSuccess && (
-          <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-3 text-xs text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-            <div className="flex-1">{resetSuccess}</div>
-          </div>
-        )}
-
-        {/* Tab Switcher */}
-        <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-1 mb-4 text-xs font-semibold">
+        {/* PRIMARY ACTION: 1-Click Google Sign-In */}
+        <div className="space-y-3">
           <button
-            type="button"
-            id="tab-login"
-            onClick={() => {
-              setMode('login');
-              setError(null);
-            }}
-            className={`flex-1 py-1.5 rounded-lg transition-all ${
-              mode === 'login'
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            Entrar
-          </button>
-          <button
-            type="button"
-            id="tab-register"
-            onClick={() => {
-              setMode('register');
-              setError(null);
-            }}
-            className={`flex-1 py-1.5 rounded-lg transition-all ${
-              mode === 'register'
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            Criar Nova Conta
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleEmailAuth} className="space-y-3.5">
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Nome Completo / Empresa *
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Eddy Arcanjo / Loja de Personalizados"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600"
-                />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              E-mail *
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                id="input-auth-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600 font-medium"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Senha *
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                id="input-auth-password"
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'register' ? 'Mínimo 6 caracteres' : 'Sua senha'}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-9 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600 font-medium"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                title={showPassword ? 'Ocultar senha' : 'Ver senha'}
-              >
-                {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-            {mode === 'login' && (
-              <div className="flex justify-end pt-1">
-                <button
-                  type="button"
-                  onClick={handleResetPassword}
-                  className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                >
-                  Esqueci minha senha / Definir nova senha
-                </button>
-              </div>
-            )}
-          </div>
-
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Confirmar Senha *
-              </label>
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repita sua senha"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600"
-                />
-              </div>
-            </div>
-          )}
-
-          <button
-            id="btn-submit-auth"
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 py-3 text-xs font-bold text-white shadow-md shadow-indigo-600/20 active:scale-98 transition-all disabled:opacity-50 mt-3 cursor-pointer"
-          >
-            <LogIn className="h-4 w-4" />
-            <span>
-              {isLoading
-                ? 'Autenticando...'
-                : mode === 'login'
-                ? 'Entrar no Sistema'
-                : 'Criar Minha Conta & Iniciar'}
-            </span>
-          </button>
-        </form>
-
-        {/* Alternative options */}
-        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5 text-center">
-          <button
+            id="btn-google-login"
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 py-2.5 px-4 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 py-3.5 px-4 text-sm font-bold text-slate-800 dark:text-white shadow-sm hover:shadow-md transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
           >
-            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+            <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -365,17 +117,59 @@ export const AuthScreen: React.FC = () => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Entrar com Google (caso conta criada pelo Google)</span>
+            <span>{isLoading ? 'Conectando...' : 'Entrar com Google'}</span>
           </button>
+          <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
+            Acesso em 1 clique com sua conta Google (sem precisar digitar senha)
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+          </div>
+          <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider">
+            <span className="bg-white dark:bg-slate-850 px-3 text-slate-400 dark:text-slate-500">
+              Ou Acesso Direto Sem Senha
+            </span>
+          </div>
+        </div>
+
+        {/* SECONDARY ACTION: Passwordless Instant Access */}
+        <form onSubmit={handleQuickLogin} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Nome do Operador / Loja
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                id="input-operator-name"
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="Seu Nome ou Nome da Loja"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600 font-medium"
+              />
+            </div>
+          </div>
 
           <button
-            type="button"
-            onClick={handleGuestLogin}
+            id="btn-quick-login"
+            type="submit"
             disabled={isLoading}
-            className="text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 py-3 text-xs font-bold text-white shadow-md shadow-indigo-600/20 active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
           >
-            Deseja testar sem senha agora? <span className="underline font-semibold">Acesso Rápido</span>
+            <Zap className="h-4 w-4 fill-white" />
+            <span>{isLoading ? 'Entrando...' : 'Entrar no Sistema Sem Senha'}</span>
           </button>
+        </form>
+
+        {/* Security badge */}
+        <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+          <ShieldCheck className="h-4 w-4 shrink-0" />
+          <span>Login protegido sem risco de erro de credenciais</span>
         </div>
       </div>
 
