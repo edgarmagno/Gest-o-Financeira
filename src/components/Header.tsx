@@ -22,10 +22,13 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const {
     currentUser,
+    authUser,
     notifications,
     lastSyncTime,
     isCloudSyncing,
+    syncSavedData,
     setIsQuickActionOpen,
+    setIsLoginModalOpen,
     setActiveModule,
     markNotificationAsRead,
     clearNotifications,
@@ -108,16 +111,26 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           )}
         </button>
 
-        {/* Cloud Online Status Pill */}
-        <div
+        {/* Cloud Online Status & Sync Button */}
+        <button
           id="btn-cloud-sync-header"
-          className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200/80 dark:border-slate-750 bg-white dark:bg-slate-800/90 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-xs"
-          title="Sincronização em tempo real ativa no Google Cloud Firestore"
+          onClick={() => syncSavedData()}
+          disabled={isCloudSyncing}
+          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+            authUser?.isAnonymous
+              ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
+              : 'border-slate-200/80 dark:border-slate-750 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750'
+          }`}
+          title="Clique para sincronizar todos os seus dados salvos com a nuvem"
         >
-          <Cloud className={`h-3.5 w-3.5 ${isCloudSyncing ? 'text-indigo-500 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
-          <span>{isCloudSyncing ? 'Sincronizando...' : `Nuvem: ${lastSyncTime}`}</span>
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-        </div>
+          <RefreshCw className={`h-3.5 w-3.5 ${isCloudSyncing ? 'animate-spin text-indigo-600 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
+          <span className="hidden sm:inline">
+            {isCloudSyncing ? 'Sincronizando...' : authUser?.isAnonymous ? 'Sincronizar Dados Salvos' : `Nuvem: ${lastSyncTime}`}
+          </span>
+          <span className="sm:hidden">
+            {isCloudSyncing ? '...' : 'Sincronizar'}
+          </span>
+        </button>
 
         {/* Quick Action Button */}
         <button
@@ -227,6 +240,30 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               </div>
 
               <div className="py-1 space-y-0.5">
+                <button
+                  id="btn-menu-sync"
+                  onClick={async () => {
+                    setIsUserMenuOpen(false);
+                    await syncSavedData();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+                  Sincronizar Dados Salvos
+                </button>
+
+                <button
+                  id="btn-menu-sync-modal"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    setIsLoginModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700 cursor-pointer"
+                >
+                  <Cloud className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                  Central de Sincronização
+                </button>
+
                 <button
                   id="btn-open-settings"
                   onClick={() => {

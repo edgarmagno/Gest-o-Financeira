@@ -3,6 +3,7 @@ import {
   User as FirebaseUser,
   onAuthStateChanged,
   signInWithPopup,
+  linkWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -14,6 +15,9 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
+  getDocs,
+  getDocsFromServer,
   setDoc,
   addDoc,
   updateDoc,
@@ -156,6 +160,10 @@ interface AppContextType {
   updateCompany: (settings: Partial<CompanySettings>) => Promise<void>;
   isCloudSyncing: boolean;
   lastSyncTime: string;
+  syncSavedData: () => Promise<{ success: boolean; message: string; count?: number }>;
+  syncWithGoogle: () => Promise<void>;
+  syncStatusMessage: string | null;
+  setSyncStatusMessage: (msg: string | null) => void;
   loadDemoSeedData: () => Promise<void>;
   clearAllCloudData: () => Promise<void>;
 
@@ -306,6 +314,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('Online');
+  const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
 
   // 1. Listen to Firebase Auth state
   useEffect(() => {
@@ -615,6 +624,166 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw err;
     } finally {
       setIsAuthLoading(false);
+    }
+  };
+
+  const syncWithGoogle = async () => {
+    setIsCloudSyncing(true);
+    setSyncStatusMessage('Conectando ao Google para sincronizar dados salvos...');
+    try {
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        try {
+          await linkWithPopup(auth.currentUser, googleProvider);
+        } catch (linkErr: any) {
+          if (
+            linkErr.code === 'auth/credential-already-in-use' ||
+            linkErr.code === 'auth/email-already-in-use'
+          ) {
+            await signInWithPopup(auth, googleProvider);
+          } else {
+            await signInWithPopup(auth, googleProvider);
+          }
+        }
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
+      setSyncStatusMessage('Conta Google conectada! Seus dados salvos foram sincronizados.');
+      setTimeout(() => setSyncStatusMessage(null), 5000);
+    } catch (err: any) {
+      console.error('Google sync error:', err);
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        setSyncStatusMessage(`Aviso de sincronização: ${err?.message || 'Falha ao sincronizar.'}`);
+        setTimeout(() => setSyncStatusMessage(null), 5000);
+      } else {
+        setSyncStatusMessage(null);
+      }
+      throw err;
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  const syncSavedData = async (): Promise<{ success: boolean; message: string; count?: number }> => {
+    setIsCloudSyncing(true);
+    setSyncStatusMessage('Sincronizando dados com o banco de dados na nuvem...');
+    try {
+      // If user is currently guest/anonymous or not authenticated, connect Google account first to access saved user data
+      if (!auth.currentUser || auth.currentUser.isAnonymous) {
+        await syncWithGoogle();
+        return {
+          success: true,
+          message: 'Conta Google sincronizada com sucesso! Seus dados foram carregados da nuvem.',
+        };
+      }
+
+      // If already authenticated, force-fetch all collections directly from Firestore
+      const uid = auth.currentUser.uid;
+
+      // 1. Products
+      const pSnap = await getDocsFromServer(collection(db, 'users', uid, 'products')).catch(() =>
+        getDocs(collection(db, 'users', uid, 'products'))
+      );
+      const fetchedProducts: Product[] = [];
+      pSnap.forEach((d) => fetchedProducts.push({ ...d.data(), id: d.id } as Product));
+      fetchedProducts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setProducts(fetchedProducts);
+
+      // 2. Sales
+      const sSnap = await getDocsFromServer(collection(db, 'users', uid, 'sales')).catch(() =>
+        getDocs(collection(db, 'users', uid, 'sales'))
+      );
+      const fetchedSales: Sale[] = [];
+      sSnap.forEach((d) => {
+        const data = d.data();
+        fetchedSales.push({ ...data, id: d.id, items: Array.isArray(data.items) ? data.items : [] } as Sale);
+      });
+      fetchedSales.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setSales(fetchedSales);
+
+      // 3. Customers
+      const cSnap = await getDocsFromServer(collection(db, 'users', uid, 'customers')).catch(() =>
+        getDocs(collection(db, 'users', uid, 'customers'))
+      );
+      const fetchedCustomers: Customer[] = [];
+      cSnap.forEach((d) => fetchedCustomers.push({ ...d.data(), id: d.id } as Customer));
+      fetchedCustomers.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setCustomers(fetchedCustomers);
+
+      // 4. Quotes
+      const qSnap = await getDocsFromServer(collection(db, 'users', uid, 'quotes')).catch(() =>
+        getDocs(collection(db, 'users', uid, 'quotes'))
+      );
+      const fetchedQuotes: Quote[] = [];
+      qSnap.forEach((d) => {
+        const data = d.data();
+        fetchedQuotes.push({ ...data, id: d.id, items: Array.isArray(data.items) ? data.items : [] } as Quote);
+      });
+      fetchedQuotes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setQuotes(fetchedQuotes);
+
+      // 5. Financial Transactions
+      const tSnap = await getDocsFromServer(collection(db, 'users', uid, 'transactions')).catch(() =>
+        getDocs(collection(db, 'users', uid, 'transactions'))
+      );
+      const fetchedTransactions: FinancialTransaction[] = [];
+      tSnap.forEach((d) => fetchedTransactions.push({ ...d.data(), id: d.id } as FinancialTransaction));
+      fetchedTransactions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setTransactions(fetchedTransactions);
+
+      // 6. Production Orders
+      const poSnap = await getDocsFromServer(collection(db, 'users', uid, 'production_orders')).catch(() =>
+        getDocs(collection(db, 'users', uid, 'production_orders'))
+      );
+      const fetchedOrders: ProductionOrder[] = [];
+      poSnap.forEach((d) => {
+        const data = d.data();
+        fetchedOrders.push({
+          ...data,
+          id: d.id,
+          items: Array.isArray(data.items) ? data.items : [],
+          materials: Array.isArray(data.materials) ? data.materials : [],
+          logs: Array.isArray(data.logs) ? data.logs : [],
+        } as ProductionOrder);
+      });
+      fetchedOrders.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setProductionOrders(fetchedOrders);
+
+      // 7. Company Settings
+      const compSnap = await getDocFromServer(doc(db, 'users', uid, 'settings', 'company')).catch(() =>
+        getDoc(doc(db, 'users', uid, 'settings', 'company'))
+      );
+      if (compSnap.exists()) {
+        const compData = compSnap.data() as CompanySettings;
+        setCompany((prev) => ({ ...prev, ...compData }));
+      }
+
+      const totalItems =
+        fetchedProducts.length +
+        fetchedSales.length +
+        fetchedCustomers.length +
+        fetchedQuotes.length +
+        fetchedTransactions.length +
+        fetchedOrders.length;
+
+      const nowStr = new Date().toLocaleTimeString('pt-BR');
+      setLastSyncTime(nowStr);
+      const msg = `Sincronização concluída com sucesso! ${totalItems} registro(s) carregados da nuvem.`;
+      setSyncStatusMessage(msg);
+      setTimeout(() => setSyncStatusMessage(null), 5000);
+
+      return {
+        success: true,
+        message: msg,
+        count: totalItems,
+      };
+    } catch (err: any) {
+      console.error('Erro na sincronização manual:', err);
+      const errMsg = `Erro ao sincronizar: ${err?.message || 'Falha de comunicação com o banco.'}`;
+      setSyncStatusMessage(errMsg);
+      setTimeout(() => setSyncStatusMessage(null), 6000);
+      return { success: false, message: errMsg };
+    } finally {
+      setIsCloudSyncing(false);
     }
   };
 
@@ -1473,6 +1642,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCompany,
         isCloudSyncing,
         lastSyncTime,
+        syncSavedData,
+        syncWithGoogle,
+        syncStatusMessage,
+        setSyncStatusMessage,
         loadDemoSeedData,
         clearAllCloudData,
         notifications,
