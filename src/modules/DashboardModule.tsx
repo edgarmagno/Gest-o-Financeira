@@ -173,8 +173,8 @@ export const DashboardModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Cloud Sync Callout Banner if guest or if user has no products loaded */}
-      {authUser?.isAnonymous && products.length === 0 && (
+      {/* Cloud Sync Callout Banner if user has no products loaded */}
+      {products.length === 0 && (
         <div className="rounded-xl border border-indigo-200/80 dark:border-indigo-850 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/30 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs shrink-0">
@@ -185,7 +185,7 @@ export const DashboardModule: React.FC = () => {
                 Sincronização de Dados em Nuvem
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-300">
-                Seus dados cadastrados anteriormente estão na nuvem vinculados ao seu e-mail (arcanjoeddy@gmail.com). Clique para sincronizar agora.
+                Seus dados cadastrados estão vinculados ao login oficial (<strong className="font-semibold text-indigo-600 dark:text-indigo-400">edgar.magno@live.com</strong>). Clique para sincronizar agora.
               </p>
             </div>
           </div>

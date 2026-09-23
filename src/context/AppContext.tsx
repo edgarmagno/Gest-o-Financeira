@@ -192,9 +192,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 const DEFAULT_USER: User = {
-  id: 'guest',
-  name: 'Carregando...',
-  email: '',
+  id: 'edgar-magno',
+  name: 'Edgar Magno',
+  email: 'edgar.magno@live.com',
   role: 'ADMIN',
 };
 
@@ -320,8 +320,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       setIsAuthLoading(true);
-      if (fbUser) {
+
+      const loggedOutExplicitly = localStorage.getItem('gestao_pro_logged_out') === 'true';
+
+      // If anonymous or no user, and user hasn't explicitly logged out, auto-login as edgar.magno@live.com
+      if ((!fbUser || fbUser.isAnonymous) && !loggedOutExplicitly) {
+        try {
+          await signInWithEmailAndPassword(auth, 'edgar.magno@live.com', '123456');
+          return; // Will re-trigger onAuthStateChanged with the authenticated user
+        } catch (autoErr: any) {
+          if (
+            autoErr.code === 'auth/user-not-found' ||
+            autoErr.code === 'auth/invalid-credential' ||
+            autoErr.code === 'auth/invalid-login-credentials'
+          ) {
+            try {
+              const cred = await createUserWithEmailAndPassword(auth, 'edgar.magno@live.com', '123456');
+              if (cred.user) {
+                await updateProfile(cred.user, { displayName: 'Edgar Magno' });
+                return;
+              }
+            } catch (createErr) {
+              console.warn('Auto provision edgar.magno warning:', createErr);
+            }
+          }
+        }
+      }
+
+      if (fbUser && !fbUser.isAnonymous) {
         setAuthUser(fbUser);
+        localStorage.removeItem('gestao_pro_logged_out');
         
         // Fetch or create user document in Firestore
         const userDocRef = doc(db, 'users', fbUser.uid);
@@ -332,22 +360,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentUser({
               id: fbUser.uid,
               uid: fbUser.uid,
-              name: data.name || fbUser.displayName || 'Usuário',
-              email: fbUser.email || data.email || '',
+              name: data.name || fbUser.displayName || 'Edgar Magno',
+              email: fbUser.email || data.email || 'edgar.magno@live.com',
               role: data.role || 'ADMIN',
               photoURL: fbUser.photoURL || undefined,
-              isAnonymous: fbUser.isAnonymous,
+              isAnonymous: false,
             });
           } else {
-            // First time login - initialize profile & clean company settings
+            // First time login - initialize profile & company settings
+            const displayName =
+              fbUser.displayName ||
+              (fbUser.email?.toLowerCase().includes('edgar') ? 'Edgar Magno' : 'Edgar Magno');
             const initialUser: User = {
               id: fbUser.uid,
               uid: fbUser.uid,
-              name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Administrador'),
-              email: fbUser.email || '',
+              name: displayName,
+              email: fbUser.email || 'edgar.magno@live.com',
               role: 'ADMIN',
               photoURL: fbUser.photoURL || undefined,
-              isAnonymous: fbUser.isAnonymous,
+              isAnonymous: false,
               createdAt: new Date().toISOString(),
             };
             await setDoc(userDocRef, cleanFirestoreData(initialUser));
@@ -357,32 +388,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const companyDocRef = doc(db, 'users', fbUser.uid, 'settings', 'company');
             const initialCompanySettings: CompanySettings = {
               ...DEFAULT_COMPANY,
-              tradeName: fbUser.displayName ? `Comércio de ${fbUser.displayName}` : 'Minha Empresa & Loja',
-              email: fbUser.email || '',
+              tradeName: `Comércio & Estamparia de ${displayName}`,
+              email: fbUser.email || 'edgar.magno@live.com',
             };
             await setDoc(companyDocRef, cleanFirestoreData(initialCompanySettings));
+          }
+
+          // Check if user has products; if empty, initialize with catalog items
+          try {
+            const pCheck = await getDocs(collection(db, 'users', fbUser.uid, 'products'));
+            if (pCheck.empty) {
+              for (let i = 0; i < DEMO_PRODUCTS.length; i++) {
+                const p = DEMO_PRODUCTS[i];
+                const pId = `demo-prod-${i + 1}`;
+                await setDoc(
+                  doc(db, 'users', fbUser.uid, 'products', pId),
+                  cleanFirestoreData({ ...p, id: pId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+                );
+              }
+              for (let i = 0; i < DEMO_CUSTOMERS.length; i++) {
+                const c = DEMO_CUSTOMERS[i];
+                const cId = `demo-cust-${i + 1}`;
+                await setDoc(
+                  doc(db, 'users', fbUser.uid, 'customers', cId),
+                  cleanFirestoreData({ ...c, id: cId, createdAt: new Date().toISOString(), totalSpent: 0, ordersCount: 0 })
+                );
+              }
+              for (let i = 0; i < DEMO_PRODUCTION_ORDERS.length; i++) {
+                const po = DEMO_PRODUCTION_ORDERS[i];
+                const poId = `demo-po-${i + 1}`;
+                await setDoc(
+                  doc(db, 'users', fbUser.uid, 'production_orders', poId),
+                  cleanFirestoreData({ ...po, id: poId, createdAt: new Date().toISOString() })
+                );
+              }
+            }
+          } catch (seedErr) {
+            console.warn('Initial data seeding check:', seedErr);
           }
         } catch (err) {
           console.error('Error fetching user profile:', err);
           setCurrentUser({
             id: fbUser.uid,
             uid: fbUser.uid,
-            name: fbUser.displayName || 'Usuário',
-            email: fbUser.email || '',
+            name: fbUser.displayName || 'Edgar Magno',
+            email: fbUser.email || 'edgar.magno@live.com',
             role: 'ADMIN',
             photoURL: fbUser.photoURL || undefined,
-            isAnonymous: fbUser.isAnonymous,
+            isAnonymous: false,
           });
         }
       } else {
-        // Sem usuário logado: faz login anônimo automático silenciosamente para que o usuário entre direto no sistema sem login
-        try {
-          await signInAnonymously(auth);
-        } catch (anonErr) {
-          console.warn('Aviso login anônimo (acessando direto em modo local):', anonErr);
-          setCurrentUser(DEFAULT_USER);
-          setIsAuthLoading(false);
-        }
+        // User is not authenticated or explicitly signed out
+        setAuthUser(null);
+        setCurrentUser(DEFAULT_USER);
       }
       setIsAuthLoading(false);
     });
@@ -665,18 +724,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const syncSavedData = async (): Promise<{ success: boolean; message: string; count?: number }> => {
     setIsCloudSyncing(true);
-    setSyncStatusMessage('Sincronizando dados com o banco de dados na nuvem...');
+    setSyncStatusMessage('Sincronizando dados salvos com edgar.magno@live.com no Firestore...');
     try {
-      // If user is currently guest/anonymous or not authenticated, connect Google account first to access saved user data
+      // If user is not authenticated or anonymous, ensure logged in as edgar.magno@live.com
       if (!auth.currentUser || auth.currentUser.isAnonymous) {
-        await syncWithGoogle();
-        return {
-          success: true,
-          message: 'Conta Google sincronizada com sucesso! Seus dados foram carregados da nuvem.',
-        };
+        await loginWithEmail('edgar.magno@live.com', '123456');
       }
 
-      // If already authenticated, force-fetch all collections directly from Firestore
+      if (!auth.currentUser) {
+        throw new Error('Falha ao autenticar usuário edgar.magno@live.com');
+      }
+
+      // Force-fetch all collections directly from Firestore
       const uid = auth.currentUser.uid;
 
       // 1. Products
@@ -767,7 +826,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const nowStr = new Date().toLocaleTimeString('pt-BR');
       setLastSyncTime(nowStr);
-      const msg = `Sincronização concluída com sucesso! ${totalItems} registro(s) carregados da nuvem.`;
+      const msg = `Sincronização concluída com sucesso! ${totalItems} registro(s) sincronizados no login edgar.magno@live.com.`;
       setSyncStatusMessage(msg);
       setTimeout(() => setSyncStatusMessage(null), 5000);
 
@@ -789,6 +848,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginWithEmail = async (email: string, pass: string) => {
     setIsAuthLoading(true);
+    localStorage.removeItem('gestao_pro_logged_out');
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err: any) {
@@ -802,7 +862,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           const cred = await createUserWithEmailAndPassword(auth, email, pass);
           if (cred.user) {
-            const displayName = email.toLowerCase().includes('arcanjo') ? 'Eddy Arcanjo' : email.split('@')[0];
+            const displayName = email.toLowerCase().includes('edgar') ? 'Edgar Magno' : email.split('@')[0];
             await updateProfile(cred.user, { displayName });
             const userDocRef = doc(db, 'users', cred.user.uid);
             const newUser: User = {
@@ -815,6 +875,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
             await setDoc(userDocRef, cleanFirestoreData(newUser));
             setCurrentUser(newUser);
+
+            // Populate catalog into Firestore
+            for (let i = 0; i < DEMO_PRODUCTS.length; i++) {
+              const p = DEMO_PRODUCTS[i];
+              const pId = `demo-prod-${i + 1}`;
+              await setDoc(
+                doc(db, 'users', cred.user.uid, 'products', pId),
+                cleanFirestoreData({ ...p, id: pId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+              );
+            }
+            for (let i = 0; i < DEMO_CUSTOMERS.length; i++) {
+              const c = DEMO_CUSTOMERS[i];
+              const cId = `demo-cust-${i + 1}`;
+              await setDoc(
+                doc(db, 'users', cred.user.uid, 'customers', cId),
+                cleanFirestoreData({ ...c, id: cId, createdAt: new Date().toISOString(), totalSpent: 0, ordersCount: 0 })
+              );
+            }
+            for (let i = 0; i < DEMO_PRODUCTION_ORDERS.length; i++) {
+              const po = DEMO_PRODUCTION_ORDERS[i];
+              const poId = `demo-po-${i + 1}`;
+              await setDoc(
+                doc(db, 'users', cred.user.uid, 'production_orders', poId),
+                cleanFirestoreData({ ...po, id: poId, createdAt: new Date().toISOString() })
+              );
+            }
             return;
           }
         } catch (createErr: any) {
@@ -843,6 +929,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const registerWithEmail = async (email: string, pass: string, name: string) => {
     setIsAuthLoading(true);
+    localStorage.removeItem('gestao_pro_logged_out');
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       if (cred.user) {
@@ -868,39 +955,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginGuest = async (customName?: string) => {
-    setIsAuthLoading(true);
-    try {
-      const cred = await signInAnonymously(auth);
-      if (cred.user && customName && customName.trim()) {
-        try {
-          await updateProfile(cred.user, { displayName: customName.trim() });
-          const userDocRef = doc(db, 'users', cred.user.uid);
-          await setDoc(
-            userDocRef,
-            cleanFirestoreData({
-              id: cred.user.uid,
-              uid: cred.user.uid,
-              name: customName.trim(),
-              role: 'ADMIN',
-              isAnonymous: true,
-              updatedAt: new Date().toISOString(),
-            }),
-            { merge: true }
-          );
-        } catch {
-          // ignore profile update error
-        }
-      }
-    } catch (err: any) {
-      console.error('Guest login error:', err);
-      throw err;
-    } finally {
-      setIsAuthLoading(false);
-    }
+    // Forward guest login request to Edgar Magno credentials
+    await loginWithEmail('edgar.magno@live.com', '123456');
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      localStorage.setItem('gestao_pro_logged_out', 'true');
+      await signOut(auth);
+      setAuthUser(null);
+      setCurrentUser(DEFAULT_USER);
+      setProducts([]);
+      setSales([]);
+      setCustomers([]);
+      setQuotes([]);
+      setProductionOrders([]);
+      setTransactions([]);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   // Team Member Management

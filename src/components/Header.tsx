@@ -5,12 +5,14 @@ import {
   ChevronDown,
   Cloud,
   Layers,
+  LogOut,
   Menu,
   Moon,
   Plus,
   RefreshCw,
   Shield,
   Sun,
+  User,
   Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -27,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
     lastSyncTime,
     isCloudSyncing,
     syncSavedData,
+    logout,
     setIsQuickActionOpen,
     setIsLoginModalOpen,
     setActiveModule,
@@ -231,9 +234,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 shadow-lg ring-1 ring-black/5 z-50">
+            <div className="absolute right-0 mt-2 w-60 rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 shadow-lg ring-1 ring-black/5 z-50">
               <div className="border-b border-slate-100 dark:border-slate-700/60 p-2.5">
-                <p className="text-xs font-bold text-slate-900 dark:text-white">{currentUser.name}</p>
+                <p className="text-xs font-bold text-slate-900 dark:text-white">{currentUser.name || 'Edgar Magno'}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  {authUser?.email || 'edgar.magno@live.com'}
+                </p>
                 <span className={`mt-1.5 inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${getRoleBadge(currentUser.role)}`}>
                   Nível: {currentUser.role}
                 </span>
@@ -274,6 +280,20 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                 >
                   <Shield className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                   Configurações do Sistema
+                </button>
+
+                <div className="border-t border-slate-100 dark:border-slate-750 my-1"></div>
+
+                <button
+                  id="btn-menu-logout"
+                  onClick={async () => {
+                    setIsUserMenuOpen(false);
+                    await logout();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sair da Conta (Logout)
                 </button>
               </div>
             </div>

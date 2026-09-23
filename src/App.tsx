@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BarChart3, CheckCircle2, Cloud, Loader2, RefreshCw, X } from 'lucide-react';
+import { AuthScreen } from './components/AuthScreen';
 import { Header } from './components/Header';
 import { LoginModal } from './components/LoginModal';
 import { QuickActionModal } from './components/QuickActionModal';
@@ -27,9 +28,8 @@ const MainContent: React.FC = () => {
   } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [dismissSyncRibbon, setDismissSyncRibbon] = useState(false);
 
-  // Brief initial loading screen if authentication check is pending
+  // Initial loading state
   if (isAuthLoading && !authUser) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100">
@@ -38,10 +38,15 @@ const MainContent: React.FC = () => {
         </div>
         <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
           <Loader2 className="h-4 w-4 text-slate-900 dark:text-indigo-400 animate-spin" />
-          <span>Iniciando sistema comercial...</span>
+          <span>Conectando e sincronizando dados (edgar.magno@live.com)...</span>
         </div>
       </div>
     );
+  }
+
+  // If user signed out, display direct login screen without Google
+  if (!authUser) {
+    return <AuthScreen />;
   }
 
   // Render full application modules directly (no login wall)
@@ -101,36 +106,6 @@ const MainContent: React.FC = () => {
             >
               <X className="h-3.5 w-3.5" />
             </button>
-          </div>
-        )}
-
-        {/* Sync Saved Data Callout Ribbon for Anonymous / Guest session */}
-        {authUser?.isAnonymous && !dismissSyncRibbon && (
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 border-b border-indigo-100 dark:border-indigo-900/50 px-4 py-2 text-xs flex items-center justify-between gap-3 text-indigo-950 dark:text-indigo-200">
-            <div className="flex items-center gap-2 min-w-0">
-              <Cloud className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <p className="truncate">
-                <strong className="font-semibold">Recuperar Dados Salvos:</strong> Conecte sua conta Google para sincronizar todos os seus produtos e vendas cadastrados na nuvem.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                id="btn-sync-ribbon"
-                onClick={() => syncSavedData()}
-                disabled={isCloudSyncing}
-                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3 py-1 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer"
-              >
-                <RefreshCw className={`h-3 w-3 ${isCloudSyncing ? 'animate-spin' : ''}`} />
-                <span>{isCloudSyncing ? 'Sincronizando...' : 'Sincronizar Meus Dados Salvos'}</span>
-              </button>
-              <button
-                onClick={() => setDismissSyncRibbon(true)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
-                title="Fechar aviso"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
           </div>
         )}
 

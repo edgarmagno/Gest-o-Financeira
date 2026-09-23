@@ -186,11 +186,11 @@ export const DEFAULT_SALES_CHANNELS: string[] = [
 ];
 
 export const DEFAULT_COMPANY: CompanySettings = {
-  tradeName: 'Minha Empresa & Loja',
-  corporateName: 'Minha Empresa LTDA',
+  tradeName: 'Edgar Magno Comércio & Personalizados',
+  corporateName: 'Edgar Magno LTDA',
   cnpj: '',
   phone: '',
-  email: '',
+  email: 'edgar.magno@live.com',
   address: '',
   city: '',
   state: 'SP',
