@@ -16,6 +16,23 @@ export interface User {
 
 export type UnitType = 'UN' | 'KG' | 'CX' | 'PCT' | 'PAR' | 'L' | 'M';
 
+export interface Print3DSpecs {
+  modelName: string;
+  filamentType: string; // PLA, PETG, ABS, TPU, Resina, etc.
+  filamentGrams: number;
+  filamentCostPerKg: number;
+  printHours: number;
+  printMinutes: number;
+  machineHourlyCost: number; // energia + desgaste/depreciação
+  finishingCost: number; // lixamento / suporte / acabamento
+  failMarginPercent: number; // margem de risco de perda (ex: 10%)
+  profitMarginPercent: number; // margem de lucro calculada (ex: 65%)
+  calculatedCost: number; // custo total unitário de fabricação
+  suggestedPrice: number; // preço unitário sugerido
+  finalUnitPrice: number; // preço unitário cobrado
+  notes?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -30,6 +47,8 @@ export interface Product {
   status: 'active' | 'inactive';
   notes?: string;
   imageUrl?: string;
+  productType?: 'STANDARD' | '3D_PRINT';
+  specs3D?: Print3DSpecs;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +91,8 @@ export interface SaleItem {
   costPrice: number;
   discount: number;
   subtotal: number;
+  is3DPrint?: boolean;
+  specs3D?: Print3DSpecs;
 }
 
 export type PaymentMethod =
@@ -188,6 +209,7 @@ export type ProductionPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
 
 export type ProductionType =
   | 'PERSONALIZACAO'
+  | 'IMPRESSAO_3D'
   | 'SUBLIMACAO'
   | 'BORDADO'
   | 'SILK_SCREEN'
@@ -202,6 +224,7 @@ export interface ProductionItem {
   quantity: number;
   unit?: UnitType;
   specs?: string; // Detalhes da personalização (nome, tema, estampa, cor, tamanho)
+  specs3D?: Print3DSpecs;
   unitCost?: number;
   unitPrice?: number;
 }

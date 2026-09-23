@@ -394,30 +394,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       setIsAuthLoading(true);
 
-      const loggedOutExplicitly = localStorage.getItem('gestao_pro_logged_out') === 'true';
-
-      // If anonymous or no user, and user hasn't explicitly logged out, auto-login as edgar.magno@live.com
-      if ((!fbUser || fbUser.isAnonymous) && !loggedOutExplicitly) {
-        try {
-          await signInWithEmailAndPassword(auth, 'edgar.magno@live.com', '123456');
-          return; // Will re-trigger onAuthStateChanged with the authenticated user
-        } catch (autoErr: any) {
-          if (
-            autoErr.code === 'auth/user-not-found' ||
-            autoErr.code === 'auth/invalid-credential' ||
-            autoErr.code === 'auth/invalid-login-credentials'
-          ) {
-            try {
-              const cred = await createUserWithEmailAndPassword(auth, 'edgar.magno@live.com', '123456');
-              if (cred.user) {
-                await updateProfile(cred.user, { displayName: 'Edgar Magno' });
-                return;
-              }
-            } catch (createErr) {
-              console.warn('Auto provision edgar.magno warning:', createErr);
-            }
-          }
-        }
+      if (!fbUser || fbUser.isAnonymous) {
+        setAuthUser(null);
+        setCurrentUser(DEFAULT_USER);
+        setIsAuthLoading(false);
+        return;
       }
 
       if (fbUser && !fbUser.isAnonymous) {
@@ -882,7 +863,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const nowStr = new Date().toLocaleTimeString('pt-BR');
       setLastSyncTime(nowStr);
-      const msg = `Sincronização concluída com sucesso! ${totalItems} registro(s) sincronizados no login edgar.magno@live.com.`;
+      const msg = `Sincronização concluída com sucesso! ${totalItems} registro(s) sincronizados.`;
       setSyncStatusMessage(msg);
       setTimeout(() => setSyncStatusMessage(null), 5000);
 
@@ -988,8 +969,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginGuest = async (customName?: string) => {
-    // Forward guest login request to Edgar Magno credentials
-    await loginWithEmail('edgar.magno@live.com', '123456');
+    try {
+      await signInAnonymously(auth);
+    } catch {
+      // no-op
+    }
   };
 
   const logout = async () => {
@@ -1483,11 +1467,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startProductionFromQuote = (quote: Quote) => {
     const firstItem = (quote.items || [])[0];
     const totalQty = (quote.items || []).reduce((acc, it) => acc + it.quantity, 0) || 1;
+    const has3D = (quote.items || []).some((it) => it.is3DPrint || it.specs3D);
+    const customDetails = (quote.items || [])
+      .map((it) => {
+        let desc = `${it.quantity}x ${it.name}`;
+        if (it.specs3D) {
+          desc += ` [3D: ${it.specs3D.filamentGrams}g ${it.specs3D.filamentType}, ${it.specs3D.printHours}h${it.specs3D.printMinutes}m]`;
+        }
+        return desc;
+      })
+      .join(' | ');
+
     const draft: Partial<ProductionOrder> = {
       title: firstItem ? `${firstItem.name}` : `Pedido ref. Orçamento ${quote.code}`,
-      productName: firstItem ? firstItem.name : 'Personalizados',
+      productName: firstItem ? firstItem.name : (has3D ? 'Peça 3D Sob Medida' : 'Personalizados'),
       quantity: totalQty,
-      type: 'PERSONALIZACAO',
+      type: has3D ? 'IMPRESSAO_3D' : 'PERSONALIZACAO',
       priority: 'MEDIA',
       status: 'PENDENTE',
       customerId: quote.customerId,
@@ -1498,7 +1493,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       relatedQuoteCode: quote.code,
       totalValue: quote.total,
       notes: quote.notes || '',
-      customDetails: (quote.items || []).map((it) => `${it.quantity}x ${it.name}`).join(' | '),
+      customDetails,
+      items: (quote.items || []).map((it, idx) => ({
+        id: `p-item-${idx}-${Date.now()}`,
+        name: it.name,
+        quantity: it.quantity,
+        productionType: (it.is3DPrint || it.specs3D) ? 'IMPRESSAO_3D' : 'PERSONALIZACAO',
+        specs3D: it.specs3D,
+        notes: it.specs3D ? `${it.specs3D.filamentGrams}g de filamento ${it.specs3D.filamentType}` : undefined,
+      })),
     };
     setActiveProductionDraft(draft);
     setActiveModule('production');
@@ -1507,11 +1510,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startProductionFromSale = (sale: Sale) => {
     const firstItem = (sale.items || [])[0];
     const totalQty = (sale.items || []).reduce((acc, it) => acc + it.quantity, 0) || 1;
+    const has3D = (sale.items || []).some((it) => it.is3DPrint || it.specs3D);
+    const customDetails = (sale.items || [])
+      .map((it) => {
+        let desc = `${it.quantity}x ${it.name}`;
+        if (it.specs3D) {
+          desc += ` [3D: ${it.specs3D.filamentGrams}g ${it.specs3D.filamentType}, ${it.specs3D.printHours}h${it.specs3D.printMinutes}m]`;
+        }
+        return desc;
+      })
+      .join(' | ');
+
     const draft: Partial<ProductionOrder> = {
       title: firstItem ? `${firstItem.name}` : `Pedido ref. Venda ${sale.code}`,
-      productName: firstItem ? firstItem.name : 'Personalizados',
+      productName: firstItem ? firstItem.name : (has3D ? 'Peça 3D Sob Medida' : 'Personalizados'),
       quantity: totalQty,
-      type: 'PERSONALIZACAO',
+      type: has3D ? 'IMPRESSAO_3D' : 'PERSONALIZACAO',
       priority: 'ALTA',
       status: 'PENDENTE',
       customerId: sale.customerId,
@@ -1521,7 +1535,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       relatedSaleCode: sale.code,
       totalValue: sale.total,
       notes: sale.notes || '',
-      customDetails: (sale.items || []).map((it) => `${it.quantity}x ${it.name}`).join(' | '),
+      customDetails,
+      items: (sale.items || []).map((it, idx) => ({
+        id: `p-item-${idx}-${Date.now()}`,
+        name: it.name,
+        quantity: it.quantity,
+        productionType: (it.is3DPrint || it.specs3D) ? 'IMPRESSAO_3D' : 'PERSONALIZACAO',
+        specs3D: it.specs3D,
+        notes: it.specs3D ? `${it.specs3D.filamentGrams}g de filamento ${it.specs3D.filamentType}` : undefined,
+      })),
     };
     setActiveProductionDraft(draft);
     setActiveModule('production');

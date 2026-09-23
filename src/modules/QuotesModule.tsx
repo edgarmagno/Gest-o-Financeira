@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowRight,
+  Box,
   Calendar,
   CheckCircle,
   Clock,
@@ -18,14 +19,16 @@ import {
   Printer,
   Search,
   Share2,
+  Sparkles,
   Trash2,
   UserCheck,
   X,
   Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { Quote, QuoteStatus, SaleItem } from '../types';
+import { Print3DSpecs, Quote, QuoteStatus, SaleItem } from '../types';
 import { downloadFile, formatCurrency, formatDate } from '../utils/formatters';
+import { Print3DCalculatorModal } from '../components/Print3DCalculatorModal';
 
 export const QuotesModule: React.FC = () => {
   const {
@@ -59,6 +62,10 @@ export const QuotesModule: React.FC = () => {
   const [selectedProdToAdd, setSelectedProdToAdd] = useState('');
   const [discountInput, setDiscountInput] = useState<string>('');
 
+  // 3D Print Calculator modal state
+  const [isPrint3DModalOpen, setIsPrint3DModalOpen] = useState(false);
+  const [print3DInitialValues, setPrint3DInitialValues] = useState<any>(null);
+
   const parseDecimalValue = (val: string): number => {
     if (!val) return 0;
     const clean = val.replace(/\s/g, '').replace(',', '.');
@@ -86,6 +93,7 @@ export const QuotesModule: React.FC = () => {
     setNotes('');
     setQuoteItems([]);
     setDiscountInput('');
+    setPrint3DInitialValues(null);
     setIsFormOpen(true);
   };
 
@@ -103,6 +111,17 @@ export const QuotesModule: React.FC = () => {
   const handleAddItem = () => {
     const prod = products.find((p) => p.id === selectedProdToAdd);
     if (!prod) return;
+
+    // Se o produto selecionado for Peça 3D, abre a calculadora com preço dinâmico
+    if (prod.productType === '3D_PRINT' || prod.category === 'Peças 3D & Impressão 3D') {
+      setPrint3DInitialValues({
+        name: prod.name,
+        notes: prod.notes || '',
+      });
+      setIsPrint3DModalOpen(true);
+      setSelectedProdToAdd('');
+      return;
+    }
 
     const existing = quoteItems.find((it) => it.productId === prod.id);
     if (existing) {
@@ -132,6 +151,31 @@ export const QuotesModule: React.FC = () => {
       setQuoteItems((prev) => [newItem, ...prev]);
     }
     setSelectedProdToAdd('');
+  };
+
+  const handleConfirm3DItem = (data: {
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    costPrice: number;
+    specs: Print3DSpecs;
+    notes?: string;
+  }) => {
+    const newItemId = `3d-quote-${Date.now()}`;
+    const newItem: SaleItem = {
+      productId: newItemId,
+      name: data.name,
+      sku: `3D-${(data.specs.filamentType || 'PLA').toUpperCase()}`,
+      unit: 'UN',
+      quantity: data.quantity,
+      unitPrice: data.unitPrice,
+      costPrice: data.costPrice,
+      discount: 0,
+      subtotal: data.quantity * data.unitPrice,
+      is3DPrint: true,
+      specs3D: data.specs,
+    };
+    setQuoteItems((prev) => [newItem, ...prev]);
   };
 
   const updateItemQty = (prodId: string, delta: number) => {
@@ -321,8 +365,11 @@ export const QuotesModule: React.FC = () => {
                   </span>
                   {quote.items.slice(0, 2).map((item, idx) => (
                     <div key={idx} className="flex justify-between text-[11px] text-slate-600">
-                      <span className="truncate max-w-[170px]">
-                        {item.quantity}x {item.name}
+                      <span className="truncate max-w-[170px] flex items-center gap-1">
+                        {item.is3DPrint && (
+                          <span className="bg-indigo-100 text-indigo-700 text-[9px] font-bold px-1 rounded">3D</span>
+                        )}
+                        <span>{item.quantity}x {item.name}</span>
                       </span>
                       <span className="font-mono font-medium text-slate-800">
                         {formatCurrency(item.subtotal)}
@@ -475,7 +522,22 @@ export const QuotesModule: React.FC = () => {
 
               {/* Items Section */}
               <div className="border-t border-slate-100 pt-2.5">
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Adicionar Itens do Catálogo</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Itens da Proposta (Catálogo ou Peças 3D)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrint3DInitialValues(null);
+                      setIsPrint3DModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg border border-indigo-200 transition-colors"
+                  >
+                    <Box className="h-3.5 w-3.5" />
+                    <span>+ Peça 3D (Cálculo Dinâmico)</span>
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <select
                     value={selectedProdToAdd}
@@ -487,7 +549,8 @@ export const QuotesModule: React.FC = () => {
                       .filter((p) => p.status === 'active')
                       .map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} - {formatCurrency(p.salePrice)} (Estoque: {p.stock})
+                          {p.productType === '3D_PRINT' ? '🧩 [3D] ' : ''}
+                          {p.name} - {p.productType === '3D_PRINT' ? 'Preço Dinâmico Sob Medida' : formatCurrency(p.salePrice)}
                         </option>
                       ))}
                   </select>
@@ -516,7 +579,21 @@ export const QuotesModule: React.FC = () => {
                     ) : (
                       quoteItems.map((it) => (
                         <div key={it.productId} className="p-2 flex items-center justify-between gap-2">
-                          <div className="flex-1 truncate font-medium text-slate-900">{it.name}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-medium text-slate-900">{it.name}</span>
+                              {it.is3DPrint && (
+                                <span className="rounded bg-indigo-50 border border-indigo-200 px-1 py-0.2 text-[9px] font-bold text-indigo-700">
+                                  3D
+                                </span>
+                              )}
+                            </div>
+                            {it.specs3D && (
+                              <span className="text-[10px] text-slate-400 block truncate">
+                                {it.specs3D.filamentGrams}g ({it.specs3D.filamentType}) • {it.specs3D.printHours}h{it.specs3D.printMinutes}m
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
@@ -604,6 +681,19 @@ export const QuotesModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal: Calculadora de Peça 3D (Precificação Dinâmica) */}
+      <Print3DCalculatorModal
+        isOpen={isPrint3DModalOpen}
+        onClose={() => {
+          setIsPrint3DModalOpen(false);
+          setPrint3DInitialValues(null);
+        }}
+        onConfirm={handleConfirm3DItem}
+        initialValues={print3DInitialValues}
+        title="Precificação de Peça 3D para Orçamento"
+        confirmButtonLabel="Inserir no Orçamento"
+      />
     </div>
   );
 };

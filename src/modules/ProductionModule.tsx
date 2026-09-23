@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Box,
   Calendar,
   Check,
   CheckCircle2,
@@ -124,6 +125,7 @@ const PRIORITY_CONFIG: Record<
 
 // Exemplos rápidos de produtos personalizados
 const QUICK_PRODUCTS = [
+  'Peça 3D Personalizada',
   'Caneca Personalizada',
   'Camiseta Estampada',
   'Copo Long Drink',
@@ -654,9 +656,19 @@ export const ProductionModule: React.FC = () => {
                           {/* Produto e Quantidade em Destaque */}
                           <div className="bg-slate-50 dark:bg-slate-900/70 rounded-lg p-2 mb-2 border border-slate-100 dark:border-slate-800">
                             <div className="flex items-start justify-between gap-1">
-                              <span className="text-xs font-black text-slate-800 dark:text-slate-200 leading-snug">
-                                {prodName}
-                              </span>
+                              <div>
+                                <span className="text-xs font-black text-slate-800 dark:text-slate-200 leading-snug">
+                                  {prodName}
+                                </span>
+                                {(order.type === 'IMPRESSAO_3D' || order.items?.some((i) => i.productionType === 'IMPRESSAO_3D' || i.specs3D)) && (
+                                  <div className="mt-0.5">
+                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-bold px-1.5 py-0.2">
+                                      <Box className="w-2.5 h-2.5 text-indigo-600" />
+                                      Peça 3D
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                               <span className="shrink-0 text-xs font-black bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-md">
                                 {order.quantity || 1} un
                               </span>
@@ -807,8 +819,14 @@ export const ProductionModule: React.FC = () => {
 
                       {/* Produto & Arte */}
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-800 dark:text-slate-200">
-                          {prodName}
+                        <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                          <span>{prodName}</span>
+                          {(order.type === 'IMPRESSAO_3D' || order.items?.some((i) => i.productionType === 'IMPRESSAO_3D' || i.specs3D)) && (
+                            <span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-bold px-1.5 py-0.2">
+                              <Box className="w-2.5 h-2.5 text-indigo-600" />
+                              3D
+                            </span>
+                          )}
                         </div>
                         {order.customDetails && (
                           <div className="text-[11px] text-slate-500 italic max-w-xs truncate">
@@ -1165,14 +1183,33 @@ export const ProductionModule: React.FC = () => {
 
               <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
                 <span className="text-slate-400 block text-[11px]">Produto & Quantidade</span>
-                <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-                  {viewDetailsOrder.quantity}x {viewDetailsOrder.productName || viewDetailsOrder.title}
+                <div className="flex items-center justify-between text-sm font-bold text-slate-900 dark:text-white mt-0.5">
+                  <span>{viewDetailsOrder.quantity}x {viewDetailsOrder.productName || viewDetailsOrder.title}</span>
+                  {(viewDetailsOrder.type === 'IMPRESSAO_3D' || viewDetailsOrder.items?.some((i) => i.productionType === 'IMPRESSAO_3D' || i.specs3D)) && (
+                    <span className="inline-flex items-center gap-1 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 border border-indigo-200">
+                      <Box className="w-3 h-3 text-indigo-600" />
+                      Impressão 3D
+                    </span>
+                  )}
                 </div>
                 {viewDetailsOrder.customDetails && (
                   <div className="mt-2 text-slate-600 dark:text-slate-300 italic bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
                     "{viewDetailsOrder.customDetails}"
                   </div>
                 )}
+                {/* 3D Specs if available on items */}
+                {viewDetailsOrder.items?.filter((it) => it.specs3D).map((it, idx) => (
+                  <div key={idx} className="mt-2 p-2 rounded-lg bg-indigo-50/80 border border-indigo-200 text-xs text-indigo-950">
+                    <div className="font-bold flex items-center gap-1 text-[11px] text-indigo-900">
+                      <Box className="w-3 h-3 text-indigo-600" />
+                      Especificações Técnicas 3D: {it.name}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 mt-1 text-[10px] text-indigo-800 font-medium">
+                      <span>Filamento: {it.specs3D?.filamentGrams}g ({it.specs3D?.filamentType})</span>
+                      <span>Tempo de Máquina: {it.specs3D?.printHours}h{it.specs3D?.printMinutes}m</span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1271,6 +1308,17 @@ export const ProductionModule: React.FC = () => {
                     <p className="mt-0.5 font-medium whitespace-pre-wrap">{printOrder.customDetails}</p>
                   </div>
                 )}
+
+                {/* Parâmetros Técnicos 3D */}
+                {printOrder.items?.filter((it) => it.specs3D).map((it, idx) => (
+                  <div key={idx} className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-800">
+                    <span className="font-bold block text-[10px] text-slate-500 uppercase">Ficha Técnica 3D ({it.name}):</span>
+                    <div className="mt-0.5 grid grid-cols-2 gap-1 font-mono text-[10px]">
+                      <span>Material: {it.specs3D?.filamentGrams}g ({it.specs3D?.filamentType})</span>
+                      <span>Tempo Máquina: {it.specs3D?.printHours}h{it.specs3D?.printMinutes}m</span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Prazo e Valor */}

@@ -40,8 +40,8 @@ export const LoginModal: React.FC = () => {
     importBackupJSON,
   } = useApp();
 
-  const [inputEmail, setInputEmail] = useState('edgar.magno@live.com');
-  const [inputPass, setInputPass] = useState('123456');
+  const [inputEmail, setInputEmail] = useState('');
+  const [inputPass, setInputPass] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,17 +50,21 @@ export const LoginModal: React.FC = () => {
   if (!isLoginModalOpen) return null;
 
   const handleSyncNow = async () => {
-    setFeedback('Sincronizando dados com a conta edgar.magno@live.com...');
+    setFeedback('Sincronizando dados com a nuvem...');
     const result = await syncSavedData();
     setFeedback(result.message);
     setTimeout(() => setFeedback(null), 5000);
   };
 
-  const handleQuickLogin = async (targetEmail = 'edgar.magno@live.com', targetPass = '123456') => {
+  const handleQuickLogin = async (targetEmail = inputEmail, targetPass = inputPass) => {
+    if (!targetEmail.trim() || !targetPass) {
+      setFeedback('Informe o e-mail e senha para acessar.');
+      return;
+    }
     setIsSubmitting(true);
     setFeedback('Autenticando...');
     try {
-      await loginWithEmail(targetEmail, targetPass);
+      await loginWithEmail(targetEmail.trim(), targetPass);
       setFeedback('Login efetuado com sucesso! Dados sincronizados.');
       setTimeout(() => setFeedback(null), 4000);
     } catch (err: any) {
@@ -233,27 +237,6 @@ export const LoginModal: React.FC = () => {
             <span>Sair</span>
           </button>
         </div>
-
-        {/* 1-Click Quick Login or Re-authentication */}
-        {authUser?.email !== 'edgar.magno@live.com' && (
-          <div className="mt-4 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/50 dark:bg-indigo-950/30 p-3.5">
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
-              Conectar Conta Edgar Magno
-            </h4>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-3">
-              Entre diretamente com a conta oficial para sincronizar todos os registros.
-            </p>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('edgar.magno@live.com', '123456')}
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 py-2 text-xs font-bold text-white transition-colors cursor-pointer"
-            >
-              <UserCheck className="h-3.5 w-3.5" />
-              <span>Entrar com edgar.magno@live.com (Senha: 123456)</span>
-            </button>
-          </div>
-        )}
 
         {/* Local Backup & Export Options */}
         <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-850/50">

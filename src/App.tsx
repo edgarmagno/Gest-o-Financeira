@@ -38,7 +38,7 @@ const MainContent: React.FC = () => {
         </div>
         <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
           <Loader2 className="h-4 w-4 text-slate-900 dark:text-indigo-400 animate-spin" />
-          <span>Conectando e sincronizando dados (edgar.magno@live.com)...</span>
+          <span>Carregando dados do sistema...</span>
         </div>
       </div>
     );

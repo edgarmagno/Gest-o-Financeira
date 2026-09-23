@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart2,
+  Box,
   Check,
   Download,
   Edit2,
@@ -15,12 +16,13 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Tag,
   Trash2,
   X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { Product, UnitType } from '../types';
+import { Print3DSpecs, Product, UnitType } from '../types';
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_UNITS } from '../data/initialData';
 import {
   calculateMarginPercent,
@@ -29,6 +31,7 @@ import {
   formatCurrency,
   formatDate,
 } from '../utils/formatters';
+import { Print3DCalculatorModal } from '../components/Print3DCalculatorModal';
 
 export const ProductsModule: React.FC = () => {
   const {
@@ -56,6 +59,10 @@ export const ProductsModule: React.FC = () => {
   const [adjustReason, setAdjustReason] = useState('Entrada de Fornecedor');
   const [adjustType, setAdjustType] = useState<'IN' | 'OUT' | 'ADJUSTMENT'>('IN');
 
+  // 3D Calculator modal in Products
+  const [isPrint3DModalOpen, setIsPrint3DModalOpen] = useState(false);
+  const [product3DInitialValues, setProduct3DInitialValues] = useState<any>(null);
+
   // Product Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -70,6 +77,8 @@ export const ProductsModule: React.FC = () => {
     status: 'active' as 'active' | 'inactive',
     notes: '',
     imageUrl: '',
+    productType: 'STANDARD' as 'STANDARD' | '3D_PRINT',
+    specs3D: undefined as Print3DSpecs | undefined,
   });
 
   // Extract unique categories (merging company configured categories + any existing in products)
@@ -114,6 +123,8 @@ export const ProductsModule: React.FC = () => {
       status: 'active',
       notes: '',
       imageUrl: '',
+      productType: 'STANDARD',
+      specs3D: undefined,
     });
     setIsFormOpen(true);
   };
@@ -133,8 +144,44 @@ export const ProductsModule: React.FC = () => {
       status: p.status,
       notes: p.notes || '',
       imageUrl: p.imageUrl || '',
+      productType: p.productType || (p.category === 'Peças 3D & Impressão 3D' ? '3D_PRINT' : 'STANDARD'),
+      specs3D: p.specs3D,
     });
     setIsFormOpen(true);
+  };
+
+  const handleOpen3DCalculatorFromForm = () => {
+    setProduct3DInitialValues({
+      name: formData.name || 'Peça 3D Personalizada',
+      filamentType: formData.specs3D?.filamentType || 'PLA',
+      filamentGrams: formData.specs3D?.filamentGrams || 70,
+      printHours: formData.specs3D?.printHours || 4,
+      printMinutes: formData.specs3D?.printMinutes || 30,
+      notes: formData.notes || '',
+    });
+    setIsPrint3DModalOpen(true);
+  };
+
+  const handleConfirm3DFromModal = (data: {
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    costPrice: number;
+    specs: Print3DSpecs;
+    notes?: string;
+  }) => {
+    if (isFormOpen) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || data.name,
+        costPrice: data.costPrice,
+        salePrice: data.unitPrice,
+        productType: '3D_PRINT',
+        category: 'Peças 3D & Impressão 3D',
+        specs3D: data.specs,
+        notes: prev.notes ? `${prev.notes} | ${data.notes || ''}` : (data.notes || ''),
+      }));
+    }
   };
 
   const handleSaveProduct = (e: React.FormEvent) => {
@@ -155,6 +202,8 @@ export const ProductsModule: React.FC = () => {
         status: formData.status,
         notes: formData.notes,
         imageUrl: formData.imageUrl,
+        productType: formData.productType,
+        specs3D: formData.specs3D,
       });
     } else {
       addProduct({
@@ -170,6 +219,8 @@ export const ProductsModule: React.FC = () => {
         status: formData.status,
         notes: formData.notes,
         imageUrl: formData.imageUrl,
+        productType: formData.productType,
+        specs3D: formData.specs3D,
       });
     }
     setIsFormOpen(false);
@@ -224,6 +275,18 @@ export const ProductsModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setProduct3DInitialValues(null);
+              setIsPrint3DModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 shadow-xs transition-colors cursor-pointer"
+            title="Calcular e Simular Custos e Preços de Peças 3D"
+          >
+            <Box className="h-3.5 w-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Calculadora 3D</span>
+          </button>
+
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
@@ -403,51 +466,83 @@ export const ProductsModule: React.FC = () => {
 
                           {/* Category */}
                           <td className="px-4 py-3">
-                            <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                              {p.category}
-                            </span>
+                            {p.productType === '3D_PRINT' || p.category === 'Peças 3D & Impressão 3D' ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                                <Box className="h-3 w-3" />
+                                Peça 3D
+                              </span>
+                            ) : (
+                              <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                {p.category}
+                              </span>
+                            )}
                           </td>
 
                           {/* Cost */}
                           <td className="px-4 py-3 text-right font-mono text-slate-500 text-[11px]">
-                            {formatCurrency(p.costPrice)}
+                            {p.productType === '3D_PRINT' ? (
+                              <span className="text-slate-400 italic">Por Filamento</span>
+                            ) : (
+                              formatCurrency(p.costPrice)
+                            )}
                           </td>
 
                           {/* Sale Price */}
                           <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">
-                            {formatCurrency(p.salePrice)}
+                            {p.productType === '3D_PRINT' ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200">
+                                <Sparkles className="h-3 w-3 text-indigo-600" />
+                                Preço Variado
+                              </span>
+                            ) : (
+                              formatCurrency(p.salePrice)
+                            )}
                           </td>
 
                           {/* Margin */}
                           <td className="px-4 py-3 text-center">
-                            <span
-                              className={`rounded-full px-2 py-0.5 font-semibold text-[10px] ${
-                                margin >= 40
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : margin >= 20
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
-                              }`}
-                            >
-                              {margin}%
-                            </span>
+                            {p.productType === '3D_PRINT' ? (
+                              <span className="rounded-full px-2 py-0.5 font-bold text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                Margem Dinâmica
+                              </span>
+                            ) : (
+                              <span
+                                className={`rounded-full px-2 py-0.5 font-semibold text-[10px] ${
+                                  margin >= 40
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : margin >= 20
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}
+                              >
+                                {margin}%
+                              </span>
+                            )}
                           </td>
 
                           {/* Stock */}
                           <td className="px-4 py-3 text-center">
                             <div className="flex flex-col items-center">
-                              <span
-                                className={`font-semibold font-mono text-xs ${
-                                  isOut
-                                    ? 'text-rose-600'
-                                    : isLow
-                                    ? 'text-amber-600'
-                                    : 'text-slate-800'
-                                }`}
-                              >
-                                {p.stock} {p.unit}
-                              </span>
-                              <span className="text-[9px] text-slate-400">Mín: {p.minStock}</span>
+                              {p.productType === '3D_PRINT' ? (
+                                <span className="font-semibold text-xs text-indigo-700 bg-indigo-50/50 px-1.5 py-0.5 rounded">
+                                  Sob Encomenda
+                                </span>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`font-semibold font-mono text-xs ${
+                                      isOut
+                                        ? 'text-rose-600'
+                                        : isLow
+                                        ? 'text-amber-600'
+                                        : 'text-slate-800'
+                                    }`}
+                                  >
+                                    {p.stock} {p.unit}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400">Mín: {p.minStock}</span>
+                                </>
+                              )}
                             </div>
                           </td>
 
@@ -587,6 +682,70 @@ export const ProductsModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveProduct} className="mt-3 space-y-3">
+              {/* Product Type Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Tipo de Produto / Item
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, productType: 'STANDARD' })}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      formData.productType === 'STANDARD'
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Package className="h-4 w-4" />
+                    <span>Produto Padrão</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        productType: '3D_PRINT',
+                        category: 'Peças 3D & Impressão 3D',
+                        unit: 'UN',
+                      })
+                    }
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      formData.productType === '3D_PRINT'
+                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                        : 'border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100'
+                    }`}
+                  >
+                    <Box className="h-4 w-4" />
+                    <span>Peça 3D (Cálculo Dinâmico)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3D Product Dynamic Pricing Explanatory Banner */}
+              {formData.productType === '3D_PRINT' && (
+                <div className="rounded-xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 border border-indigo-200 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                      <Sparkles className="h-4 w-4 text-indigo-600" />
+                      <span>Precificação Dinâmica Sob Demanda</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Peças 3D possuem custo e preço calculados por filamento (g), tempo de máquina e margem em cada venda/orçamento. Você pode simular valores de referência abaixo.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpen3DCalculatorFromForm}
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-xs cursor-pointer shrink-0"
+                  >
+                    <Box className="h-3.5 w-3.5" />
+                    <span>Simulador / Calculadora 3D</span>
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -896,6 +1055,19 @@ export const ProductsModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal: Calculadora / Simulador de Peça 3D */}
+      <Print3DCalculatorModal
+        isOpen={isPrint3DModalOpen}
+        onClose={() => {
+          setIsPrint3DModalOpen(false);
+          setProduct3DInitialValues(null);
+        }}
+        onConfirm={handleConfirm3DFromModal}
+        initialValues={product3DInitialValues}
+        title="Calculadora & Simulador de Peça 3D"
+        confirmButtonLabel={isFormOpen ? "Aplicar ao Cadastro do Produto" : "Fechar Simulador"}
+      />
     </div>
   );
 };

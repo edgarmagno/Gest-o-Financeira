@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Barcode,
+  Box,
   Check,
   CheckCircle,
   CreditCard,
@@ -16,6 +17,7 @@ import {
   Search,
   ShoppingBag,
   ShoppingCart,
+  Sparkles,
   Trash2,
   UserCheck,
   UserPlus,
@@ -23,9 +25,10 @@ import {
   Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { Customer, PaymentMethod, Product, SaleItem } from '../types';
+import { Customer, PaymentMethod, Print3DSpecs, Product, SaleItem } from '../types';
 import { DEFAULT_PAYMENT_METHODS } from '../data/initialData';
 import { formatCurrency, formatDocument, formatPhone } from '../utils/formatters';
+import { Print3DCalculatorModal } from '../components/Print3DCalculatorModal';
 
 export const PosModule: React.FC = () => {
   const { products, customers, addCustomer, createSale, setReceiptSale, currentUser, company } = useApp();
@@ -41,6 +44,10 @@ export const PosModule: React.FC = () => {
   const [newCustName, setNewCustName] = useState('');
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustDoc, setNewCustDoc] = useState('');
+
+  // 3D Print Calculator modal state
+  const [isPrint3DModalOpen, setIsPrint3DModalOpen] = useState(false);
+  const [print3DInitialValues, setPrint3DInitialValues] = useState<any>(null);
 
   // Discount & Payment
   const [discountType, setDiscountType] = useState<'FIXED' | 'PERCENT'>('FIXED');
@@ -66,9 +73,9 @@ export const PosModule: React.FC = () => {
 
   const categories = Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
 
-  // Available in-stock products
+  // Available in-stock products + on-demand 3D products
   const availableProducts = products.filter(
-    (p) => p.status === 'active' && p.stock > 0
+    (p) => p.status === 'active' && (p.stock > 0 || p.productType === '3D_PRINT' || p.category === 'Peças 3D & Impressão 3D')
   );
 
   const filteredCatalog = availableProducts.filter((p) => {
@@ -82,6 +89,16 @@ export const PosModule: React.FC = () => {
 
   // Add product to cart
   const addToCart = (product: Product, quantity = 1) => {
+    // If it's a 3D Print item with dynamic pricing, open the 3D Calculator
+    if (product.productType === '3D_PRINT' || product.category === 'Peças 3D & Impressão 3D') {
+      setPrint3DInitialValues({
+        name: product.name,
+        notes: product.notes || '',
+      });
+      setIsPrint3DModalOpen(true);
+      return;
+    }
+
     const existing = cart.find((item) => item.productId === product.id);
 
     if (existing) {
@@ -120,9 +137,33 @@ export const PosModule: React.FC = () => {
     }
   };
 
+  const handleConfirm3DItem = (data: {
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    costPrice: number;
+    specs: Print3DSpecs;
+    notes?: string;
+  }) => {
+    const newItemId = `3d-item-${Date.now()}`;
+    const newItem: SaleItem = {
+      productId: newItemId,
+      name: data.name,
+      sku: `3D-${(data.specs.filamentType || 'PLA').toUpperCase()}`,
+      unit: 'UN',
+      quantity: data.quantity,
+      unitPrice: data.unitPrice,
+      costPrice: data.costPrice,
+      discount: 0,
+      subtotal: data.quantity * data.unitPrice,
+      is3DPrint: true,
+      specs3D: data.specs,
+    };
+    setCart((prev) => [newItem, ...prev]);
+  };
+
   const updateCartItemQty = (productId: string, delta: number) => {
     const prod = products.find((p) => p.id === productId);
-    if (!prod) return;
 
     setCart((prev) =>
       prev
@@ -130,7 +171,7 @@ export const PosModule: React.FC = () => {
           if (item.productId === productId) {
             const newQty = item.quantity + delta;
             if (newQty <= 0) return null;
-            if (newQty > prod.stock) {
+            if (prod && !item.is3DPrint && newQty > prod.stock) {
               alert(`Estoque insuficiente! Apenas ${prod.stock} ${prod.unit} disponíveis.`);
               return item;
             }
@@ -265,28 +306,43 @@ export const PosModule: React.FC = () => {
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
       {/* Left side: Product Catalog & Barcode Scanner (7 cols) */}
       <div className="space-y-4 lg:col-span-7">
-        {/* Top Barcode Input Box */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-          <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
-            <div className="relative flex-1">
-              <Barcode className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                ref={barcodeInputRef}
-                type="text"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Passe o leitor de código de barras ou digite SKU / EAN..."
-                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-              />
-            </div>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 active:scale-98 transition-all shadow-xs"
-            >
-              <Zap className="h-3.5 w-3.5" />
-              <span>Inserir</span>
-            </button>
-          </form>
+        {/* Top Barcode Input Box & 3D Action */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex-1 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+            <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
+              <div className="relative flex-1">
+                <Barcode className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  placeholder="Passe o leitor de código de barras ou digite SKU / EAN..."
+                  className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                />
+              </div>
+              <button
+                type="submit"
+                className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 active:scale-98 transition-all shadow-xs"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>Inserir</span>
+              </button>
+            </form>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPrint3DInitialValues(null);
+              setIsPrint3DModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 px-4 py-3 sm:py-0 text-xs font-bold text-white shadow-xs hover:shadow-md active:scale-98 transition-all cursor-pointer shrink-0"
+            title="Calcular preço de peça 3D por peso de filamento, horas de máquina e margem"
+          >
+            <Box className="h-4 w-4 text-indigo-200" />
+            <span>+ Peça 3D (Cálculo Dinâmico)</span>
+          </button>
         </div>
 
         {/* Catalog Search & Filter */}
@@ -319,44 +375,72 @@ export const PosModule: React.FC = () => {
 
           {/* Product Grid */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 max-h-[460px] overflow-y-auto p-0.5">
-            {filteredCatalog.map((product) => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product, 1)}
-                className="group relative flex flex-col justify-between rounded-lg border border-slate-200/80 bg-white p-2.5 text-left transition-all hover:border-slate-400 hover:shadow-xs active:scale-98"
-              >
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    referrerPolicy="no-referrer"
-                    className="h-20 w-full rounded-md object-cover border border-slate-100 mb-2"
-                  />
-                ) : (
-                  <div className="flex h-20 w-full items-center justify-center rounded-md bg-slate-50 text-slate-400 mb-2">
-                    <ShoppingBag className="h-5 w-5" />
+            {filteredCatalog.map((product) => {
+              const is3D = product.productType === '3D_PRINT' || product.category === 'Peças 3D & Impressão 3D';
+              return (
+                <button
+                  key={product.id}
+                  onClick={() => addToCart(product, 1)}
+                  className={`group relative flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all hover:shadow-xs active:scale-98 ${
+                    is3D
+                      ? 'border-indigo-200 bg-indigo-50/30 hover:border-indigo-400'
+                      : 'border-slate-200/80 bg-white hover:border-slate-400'
+                  }`}
+                >
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      referrerPolicy="no-referrer"
+                      className="h-20 w-full rounded-md object-cover border border-slate-100 mb-2"
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-20 w-full items-center justify-center rounded-md mb-2 ${
+                        is3D ? 'bg-indigo-100/50 text-indigo-500' : 'bg-slate-50 text-slate-400'
+                      }`}
+                    >
+                      {is3D ? <Box className="h-6 w-6" /> : <ShoppingBag className="h-5 w-5" />}
+                    </div>
+                  )}
+
+                  <div>
+                    <span
+                      className={`inline-block text-[9px] font-bold uppercase tracking-wider ${
+                        is3D ? 'text-indigo-600' : 'text-slate-400'
+                      }`}
+                    >
+                      {is3D ? 'Peça 3D' : product.category}
+                    </span>
+                    <p className="font-semibold text-xs text-slate-900 line-clamp-2 leading-snug">
+                      {product.name}
+                    </p>
                   </div>
-                )}
 
-                <div>
-                  <span className="inline-block text-[9px] font-medium text-slate-400 uppercase tracking-wider">
-                    {product.category}
-                  </span>
-                  <p className="font-semibold text-xs text-slate-900 line-clamp-2 leading-snug">
-                    {product.name}
-                  </p>
-                </div>
-
-                <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5">
-                  <span className="font-bold text-xs text-slate-900 font-mono">
-                    {formatCurrency(product.salePrice)}
-                  </span>
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600">
-                    Est: {product.stock}
-                  </span>
-                </div>
-              </button>
-            ))}
+                  <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5">
+                    {is3D ? (
+                      <>
+                        <span className="font-bold text-[10px] text-indigo-600">
+                          Preço Variado
+                        </span>
+                        <span className="rounded bg-indigo-100/70 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700">
+                          Calcular
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-xs text-slate-900 font-mono">
+                          {formatCurrency(product.salePrice)}
+                        </span>
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600">
+                          Est: {product.stock}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -426,12 +510,25 @@ export const PosModule: React.FC = () => {
               cart.map((item) => (
                 <div key={item.productId} className="py-2 flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-xs text-slate-900 truncate leading-tight">
-                      {item.name}
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      {formatCurrency(item.unitPrice)} un
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-semibold text-xs text-slate-900 truncate leading-tight">
+                        {item.name}
+                      </p>
+                      {item.is3DPrint && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700">
+                          <Box className="h-2.5 w-2.5" />
+                          Peça 3D
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <span>{formatCurrency(item.unitPrice)} un</span>
+                      {item.specs3D && (
+                        <span className="text-[10px] font-sans text-slate-400">
+                          • {item.specs3D.filamentGrams}g ({item.specs3D.filamentType}) • {item.specs3D.printHours}h{item.specs3D.printMinutes}m máq.
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Quantity Controls */}
@@ -765,6 +862,19 @@ export const PosModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal: Calculadora de Peça 3D (Precificação Dinâmica) */}
+      <Print3DCalculatorModal
+        isOpen={isPrint3DModalOpen}
+        onClose={() => {
+          setIsPrint3DModalOpen(false);
+          setPrint3DInitialValues(null);
+        }}
+        onConfirm={handleConfirm3DItem}
+        initialValues={print3DInitialValues}
+        title="Precificação de Peça 3D para Venda"
+        confirmButtonLabel="Inserir no Carrinho da Venda"
+      />
     </div>
   );
 };

@@ -124,6 +124,7 @@ export const DEFAULT_PAYMENT_METHODS: CustomPaymentMethod[] = [
 ];
 
 export const DEFAULT_PRODUCT_CATEGORIES: string[] = [
+  'Peças 3D & Impressão 3D',
   'Eletrônicos',
   'Áudio & Acessórios',
   'Informática & Periféricos',
