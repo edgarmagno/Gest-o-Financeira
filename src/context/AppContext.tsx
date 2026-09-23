@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   updateProfile,
   signInAnonymously
@@ -77,6 +78,7 @@ interface AppContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   loginGuest: () => Promise<void>;
   logout: () => Promise<void>;
   users: User[];
@@ -640,19 +642,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
         } catch (createErr: any) {
-          // If creation fails because email already in use, it means password was genuinely wrong
+          // If creation fails because email already in use, it means password was genuinely wrong or not set
           if (createErr.code === 'auth/email-already-in-use') {
+            console.warn('User already exists in Firebase Auth with different credentials.');
             throw err;
           }
-          console.error('Auto-provisioning error:', createErr);
+          console.warn('Auto-provisioning warning:', createErr?.code || createErr);
           throw createErr;
         }
       }
-      console.error('Email login error:', err);
+      console.warn('Email login warning:', err?.code || err?.message);
       throw err;
     } finally {
       setIsAuthLoading(false);
     }
+  };
+
+  const resetPassword = async (email: string) => {
+    if (!email || !email.trim()) {
+      throw new Error('Informe o e-mail para receber o link de redefinição de senha.');
+    }
+    await sendPasswordResetEmail(auth, email.trim());
   };
 
   const registerWithEmail = async (email: string, pass: string, name: string) => {
@@ -1365,6 +1375,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
+        resetPassword,
         loginGuest,
         logout,
         users,
