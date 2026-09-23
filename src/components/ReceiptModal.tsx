@@ -1,37 +1,92 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Check,
-  CheckCircle,
   Copy,
-  FileDown,
+  Edit3,
   FileText,
+  MessageSquare,
   Printer,
   Receipt,
-  ShoppingBag,
+  Save,
   Sparkles,
   X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
+const PRESET_OBSERVATIONS = [
+  'Garantia de 90 dias contra defeitos de fabricação.',
+  'Retirada no balcão pelo cliente.',
+  'Entrega agendada no endereço cadastrado.',
+  'Arte e especificações aprovadas previamente via WhatsApp.',
+  'Sinal de 50% pago no pedido, restante na entrega.',
+  'Não aceitamos troca/devolução de produtos personalizados.',
+];
+
 export const ReceiptModal: React.FC = () => {
-  const { receiptSale, setReceiptSale, receiptQuote, setReceiptQuote, company } = useApp();
+  const {
+    receiptSale,
+    setReceiptSale,
+    receiptQuote,
+    setReceiptQuote,
+    updateSaleNotes,
+    updateQuoteNotes,
+    company,
+  } = useApp();
+
   const isSale = !!receiptSale;
   const [printFormat, setPrintFormat] = useState<'thermal' | 'a4'>(() => (isSale ? 'thermal' : 'a4'));
   const [copied, setCopied] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesInput, setNotesInput] = useState('');
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const activeDoc = receiptSale || receiptQuote;
 
+  useEffect(() => {
+    if (activeDoc) {
+      setNotesInput(activeDoc.notes || '');
+    }
+  }, [activeDoc?.id, activeDoc?.notes]);
+
   if (!activeDoc) return null;
+
+  const activeNotes = activeDoc.notes?.trim() || '';
 
   const handleClose = () => {
     setReceiptSale(null);
     setReceiptQuote(null);
+    setIsEditingNotes(false);
   };
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSaveNotes = async () => {
+    setIsSavingNotes(true);
+    try {
+      if (isSale) {
+        await updateSaleNotes(activeDoc.id, notesInput.trim());
+      } else {
+        await updateQuoteNotes(activeDoc.id, notesInput.trim());
+      }
+      setIsEditingNotes(false);
+    } catch (err) {
+      console.warn('Erro ao atualizar observações do recibo:', err);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  const handleAddPreset = (text: string) => {
+    setNotesInput((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return text;
+      if (trimmed.includes(text)) return trimmed;
+      return `${trimmed} | ${text}`;
+    });
   };
 
   // Determine logo to use and display settings
@@ -76,12 +131,14 @@ export const ReceiptModal: React.FC = () => {
       .map((it) => `${it.quantity}x ${it.name} - ${formatCurrency(it.unitPrice)} = ${formatCurrency(it.subtotal)}`)
       .join('\n');
 
+    const notesBlock = activeNotes ? `----------------------------------------\nOBSERVAÇÕES DO RECIBO:\n${activeNotes}\n` : '';
+
     const text = `
 === ${company.tradeName} ===
 ${company.corporateName} - CNPJ: ${company.cnpj}
 Tel: ${company.phone} | ${company.address}
 ----------------------------------------
-DOCUMENTO: ${isSale ? 'COMPROVANTE DE VENDA' : 'ORÇAMENTO COMERCIAL'}
+DOCUMENTO: ${isSale ? 'COMPROVANTE DE VENDA / RECIBO' : 'ORÇAMENTO COMERCIAL'}
 CÓDIGO: ${activeDoc.code}
 DATA: ${formatDate(activeDoc.createdAt, true)}
 CLIENTE: ${activeDoc.customerName}
@@ -93,7 +150,7 @@ SUBTOTAL: ${formatCurrency(activeDoc.subtotal)}
 DESCONTO: ${formatCurrency(activeDoc.discount)}
 TOTAL FINAL: ${formatCurrency(activeDoc.total)}
 ${isSale ? `FORMA DE PAGAMENTO: ${(activeDoc as any).paymentMethod}` : `VALIDADE: ${(activeDoc as any).validityDays} dias`}
-----------------------------------------
+${notesBlock}----------------------------------------
 ${company.receiptFooterMessage}
     `.trim();
 
@@ -111,50 +168,164 @@ ${company.receiptFooterMessage}
         }`}
       >
         {/* Top Control Bar (Hidden on Print) */}
-        <div className="flex items-center justify-between border-b border-slate-100 p-4 print:hidden bg-slate-50/70 rounded-t-2xl">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs">
-              {isSale ? <Receipt className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+        <div className="border-b border-slate-100 p-4 print:hidden bg-slate-50/80 rounded-t-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs">
+                {isSale ? <Receipt className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-xs">
+                  {isSale ? 'Comprovante / Recibo de Venda' : 'Proposta Comercial / Orçamento'}
+                </h3>
+                <p className="text-[10px] text-slate-500 font-mono">{activeDoc.code}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-xs">
-                {isSale ? 'Comprovante / Cupom de Venda' : 'Proposta Comercial / Orçamento Formal'}
-              </h3>
-              <p className="text-[10px] text-slate-500 font-mono">{activeDoc.code}</p>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setPrintFormat('thermal')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                    printFormat === 'thermal'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Cupom Térmico (80mm)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintFormat('a4')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                    printFormat === 'a4'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Documento A4
+                </button>
+              </div>
+              <button
+                onClick={handleClose}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+                title="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-xs">
+
+          {/* Quick Bar: Edit Observations button & status */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPrintFormat('thermal')}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                  printFormat === 'thermal'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => setIsEditingNotes(!isEditingNotes)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isEditingNotes
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : activeNotes
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                Cupom Térmico (80mm)
+                <Edit3 className="h-3 w-3" />
+                <span>{activeNotes ? 'Editar Observações' : '+ Adicionar Observações'}</span>
+                {activeNotes && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                )}
               </button>
+
+              {activeNotes ? (
+                <span className="text-[11px] text-emerald-700 font-medium hidden sm:inline">
+                  ✓ Recibo contém observações
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  Nenhuma observação informada no recibo
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPrintFormat('a4')}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                  printFormat === 'a4'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
+                onClick={handlePrint}
+                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-all cursor-pointer shadow-xs"
               >
-                Documento A4
+                <Printer className="h-3 w-3" />
+                <span>Imprimir Recibo</span>
               </button>
             </div>
-            <button
-              onClick={handleClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
+
+          {/* Collapsible Observations Editor Drawer */}
+          {isEditingNotes && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-indigo-950">
+                  <MessageSquare className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>Observações & Instruções do Recibo</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingNotes(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div>
+                <textarea
+                  id="receipt-notes-input"
+                  rows={3}
+                  value={notesInput}
+                  onChange={(e) => setNotesInput(e.target.value)}
+                  placeholder="Ex: Prazo de entrega até 25/09, garantia de 90 dias, arte confirmada pelo cliente, sinal de 50% pago..."
+                  className="w-full rounded-lg border border-indigo-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600"
+                />
+              </div>
+
+              {/* Preset Chips */}
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[10px] font-semibold text-slate-500 mr-1">Sugestões rápidas:</span>
+                {PRESET_OBSERVATIONS.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAddPreset(preset)}
+                    className="rounded-md border border-indigo-200/80 bg-white hover:bg-indigo-100/70 px-1.5 py-0.5 text-[10px] text-indigo-900 transition-colors cursor-pointer"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1 border-t border-indigo-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotesInput(activeDoc.notes || '');
+                    setIsEditingNotes(false);
+                  }}
+                  className="px-2.5 py-1 text-xs text-slate-600 hover:bg-white rounded-md transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveNotes}
+                  disabled={isSavingNotes}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-md shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="h-3 w-3" />
+                  <span>{isSavingNotes ? 'Salvando...' : 'Salvar no Recibo'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Printable Area: Thermal Format */}
@@ -193,7 +364,7 @@ ${company.receiptFooterMessage}
             {/* Doc details */}
             <div className="py-3 border-b border-dashed border-slate-300 space-y-1 text-[11px]">
               <div className="flex justify-between font-bold">
-                <span>{isSale ? 'CUPOM NÃO FISCAL' : 'ORÇAMENTO COMERCIAL'}</span>
+                <span>{isSale ? 'RECIBO / CUPOM NÃO FISCAL' : 'ORÇAMENTO COMERCIAL'}</span>
                 <span>{activeDoc.code}</span>
               </div>
               <div className="flex justify-between text-slate-600">
@@ -292,6 +463,32 @@ ${company.receiptFooterMessage}
               )}
             </div>
 
+            {/* PARTE DE OBSERVAÇÕES DO RECIBO (TÉRMICO) */}
+            {activeNotes ? (
+              <div className="py-3 my-1 border-b border-dashed border-slate-400 bg-slate-50/80 -mx-2 px-2.5 rounded-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-[10px] tracking-wide text-slate-900 uppercase">
+                    OBSERVAÇÕES DO RECIBO:
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-sans print:hidden">anotações</span>
+                </div>
+                <p className="text-[11px] text-slate-900 leading-normal font-mono whitespace-pre-wrap font-medium">
+                  {activeNotes}
+                </p>
+              </div>
+            ) : (
+              <div className="py-2 border-b border-dashed border-slate-200 text-center print:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingNotes(true)}
+                  className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Edit3 className="h-3 w-3" />
+                  + Adicionar observações neste recibo
+                </button>
+              </div>
+            )}
+
             {/* Footer Note */}
             <div className="pt-4 text-center text-[10px] text-slate-500 space-y-1">
               <p className="italic">{company.receiptFooterMessage}</p>
@@ -353,7 +550,7 @@ ${company.receiptFooterMessage}
                   Tipo de Documento
                 </span>
                 <span className="font-extrabold text-sm text-slate-900">
-                  {isSale ? 'COMPROVANTE DE VENDA / RECIBO' : 'PROPOSTA COMERCIAL / ORÇAMENTO'}
+                  {isSale ? 'RECIBO / COMPROVANTE DE VENDA' : 'PROPOSTA COMERCIAL / ORÇAMENTO'}
                 </span>
               </div>
               <div className="text-right">
@@ -448,19 +645,48 @@ ${company.receiptFooterMessage}
               </table>
             </div>
 
+            {/* PARTE DE OBSERVAÇÕES DO RECIBO (A4 DEDICADA) */}
+            {activeNotes && (
+              <div className="mb-5 rounded-xl border-2 border-indigo-200/90 bg-indigo-50/40 p-4 print:border-slate-300 print:bg-slate-50 shadow-2xs">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-indigo-100 print:border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-600 text-white print:bg-slate-800">
+                      <FileText className="h-3 w-3" />
+                    </div>
+                    <span className="font-extrabold text-[11px] uppercase tracking-wider text-indigo-950 print:text-slate-900">
+                      Observações do Recibo & Especificações
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-100/70 print:bg-slate-200 print:text-slate-800 px-2 py-0.5 rounded">
+                    Instruções da Operação
+                  </span>
+                </div>
+                <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap font-medium">
+                  {activeNotes}
+                </p>
+              </div>
+            )}
+
             {/* Totals & Notes Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div className="rounded-xl border border-slate-200 p-3 bg-slate-50/50 text-xs">
-                <h4 className="font-bold text-[11px] uppercase tracking-wider text-slate-600 mb-1.5">
-                  Observações & Condições
-                </h4>
-                <p className="text-slate-600 leading-relaxed italic">
-                  {(activeDoc as any).notes || company.receiptFooterMessage}
-                </p>
-                {isSale && (receiptSale as any).paymentMethod && (
-                  <p className="mt-2 text-slate-700">
-                    <span className="font-semibold">Pagamento:</span> {(receiptSale as any).paymentMethod}
+              <div className="rounded-xl border border-slate-200 p-3 bg-slate-50/50 text-xs flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-[11px] uppercase tracking-wider text-slate-600 mb-1.5">
+                    Condições Gerais & Mensagem da Loja
+                  </h4>
+                  <p className="text-slate-600 leading-relaxed italic">
+                    {company.receiptFooterMessage}
                   </p>
+                </div>
+                {isSale && (receiptSale as any).paymentMethod && (
+                  <div className="mt-3 pt-2 border-t border-slate-200/60 text-slate-700">
+                    <span className="font-semibold">Forma de Pagamento:</span> {(receiptSale as any).paymentMethod}
+                    {(receiptSale as any).installments && (receiptSale as any).installments > 1 && (
+                      <span className="ml-1 text-slate-500">
+                        ({(receiptSale as any).installments}x de {formatCurrency(activeDoc.total / (receiptSale as any).installments)})
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -508,25 +734,25 @@ ${company.receiptFooterMessage}
         )}
 
         {/* Action Buttons (Hidden on Print) */}
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 p-4 rounded-b-2xl print:hidden">
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 p-4 rounded-b-2xl print:hidden">
           <button
             onClick={copyReceiptText}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs cursor-pointer"
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-slate-500" />}
-            <span>{copied ? 'Copiado!' : 'Copiar Dados'}</span>
+            <span>{copied ? 'Copiado!' : 'Copiar Texto'}</span>
           </button>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleClose}
-              className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 shadow-xs"
+              className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 shadow-xs cursor-pointer"
             >
               Fechar
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-98 transition-all"
+              className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-98 transition-all cursor-pointer"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Imprimir / Salvar PDF</span>

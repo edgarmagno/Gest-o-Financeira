@@ -6,6 +6,7 @@ import {
   CheckCircle,
   CreditCard,
   DollarSign,
+  MessageSquare,
   Minus,
   Percent,
   Plus,
@@ -617,6 +618,46 @@ export const PosModule: React.FC = () => {
               }
               return null;
             })()}
+
+            {/* Observações do Recibo */}
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>Observações do Recibo</span>
+                  <span className="text-[10px] text-slate-400 font-normal">(impresso no cupom)</span>
+                </label>
+                {saleNotes && (
+                  <button
+                    type="button"
+                    onClick={() => setSaleNotes('')}
+                    className="text-[10px] text-slate-400 hover:text-rose-600 cursor-pointer"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <input
+                id="input-pos-sale-notes"
+                type="text"
+                value={saleNotes}
+                onChange={(e) => setSaleNotes(e.target.value)}
+                placeholder="Ex: Garantia 90 dias, entrega na sexta, balcão..."
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-600"
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {['Garantia 90d', 'Retirada no balcão', 'Entrega agendada', 'Arte aprovada'].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setSaleNotes((prev) => (prev ? `${prev} | ${chip}` : chip))}
+                    className="text-[10px] bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 px-1.5 py-0.5 rounded cursor-pointer transition-colors border border-slate-200/60"
+                  >
+                    + {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Totals Summary */}

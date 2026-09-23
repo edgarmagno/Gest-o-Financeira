@@ -102,6 +102,7 @@ interface AppContextType {
   sales: Sale[];
   createSale: (saleData: Omit<Sale, 'id' | 'code' | 'createdAt' | 'status' | 'costTotal' | 'profit'>) => Promise<Sale>;
   cancelSale: (saleId: string, reason?: string) => Promise<boolean>;
+  updateSaleNotes: (saleId: string, notes: string) => Promise<void>;
   receiptSale: Sale | null;
   setReceiptSale: (sale: Sale | null) => void;
 
@@ -109,6 +110,7 @@ interface AppContextType {
   quotes: Quote[];
   createQuote: (quoteData: Omit<Quote, 'id' | 'code' | 'createdAt'>) => Promise<Quote>;
   updateQuoteStatus: (id: string, status: Quote['status']) => Promise<void>;
+  updateQuoteNotes: (quoteId: string, notes: string) => Promise<void>;
   convertQuoteToSale: (quoteId: string) => Promise<Sale | null>;
   deleteQuote: (id: string) => Promise<void>;
   receiptQuote: Quote | null;
@@ -364,21 +366,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       } else {
-        setAuthUser(null);
-        setCurrentUser(DEFAULT_USER);
-        setProducts([]);
-        setSales([]);
-        setCustomers([]);
-        setQuotes([]);
-        setProductionOrders([]);
-        setTransactions([]);
-        setStockMovements([]);
-        setCompany(DEFAULT_COMPANY);
+        // Sem usuário logado: faz login anônimo automático silenciosamente para que o usuário entre direto no sistema sem login
+        try {
+          await signInAnonymously(auth);
+        } catch (anonErr) {
+          console.warn('Aviso login anônimo (acessando direto em modo local):', anonErr);
+          setCurrentUser(DEFAULT_USER);
+          setIsAuthLoading(false);
+        }
       }
       setIsAuthLoading(false);
     });
 
-    return () => unsubscribeAuth();
+    const safetyTimer = setTimeout(() => {
+      setIsAuthLoading(false);
+    }, 1500);
+
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubscribeAuth();
+    };
   }, []);
 
   // 2. Real-time Firestore Listeners for all user collections
@@ -966,6 +973,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const updateSaleNotes = async (saleId: string, notes: string): Promise<void> => {
+    if (!authUser) return;
+    const saleRef = doc(db, 'users', authUser.uid, 'sales', saleId);
+    await updateDoc(saleRef, cleanFirestoreData({ notes: notes.trim() }));
+    setSales((prev) => prev.map((s) => (s.id === saleId ? { ...s, notes: notes.trim() } : s)));
+    setReceiptSale((prev) => (prev && prev.id === saleId ? { ...prev, notes: notes.trim() } : prev));
+  };
+
   // Quotes Actions
   const createQuote = async (quoteData: Omit<Quote, 'id' | 'code' | 'createdAt'>): Promise<Quote> => {
     if (!authUser) throw new Error('Não autenticado');
@@ -987,6 +1002,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await updateDoc(quoteRef, cleanFirestoreData({ status }));
   };
 
+  const updateQuoteNotes = async (id: string, notes: string) => {
+    if (!authUser) return;
+    const quoteRef = doc(db, 'users', authUser.uid, 'quotes', id);
+    await updateDoc(quoteRef, cleanFirestoreData({ notes: notes.trim() }));
+    setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, notes: notes.trim() } : q)));
+    setReceiptQuote((prev) => (prev && prev.id === id ? { ...prev, notes: notes.trim() } : prev));
+  };
+
   const convertQuoteToSale = async (quoteId: string): Promise<Sale | null> => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote || quote.status === 'CONVERTIDO' || !authUser) return null;
@@ -1002,7 +1025,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       paymentMethod: 'PIX',
       sellerId: currentUser.id,
       sellerName: currentUser.name,
-      notes: `Venda originada do Orçamento ${quote.code}`,
+      notes: quote.notes
+        ? `${quote.notes} (Origem: Orçamento ${quote.code})`
+        : `Venda originada do Orçamento ${quote.code}`,
     });
 
     const quoteRef = doc(db, 'users', authUser.uid, 'quotes', quoteId);
@@ -1413,11 +1438,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sales,
         createSale,
         cancelSale,
+        updateSaleNotes,
         receiptSale,
         setReceiptSale,
         quotes,
         createQuote,
         updateQuoteStatus,
+        updateQuoteNotes,
         convertQuoteToSale,
         deleteQuote,
         receiptQuote,

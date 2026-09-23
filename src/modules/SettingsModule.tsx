@@ -286,6 +286,7 @@ export const SettingsModule: React.FC = () => {
       amountPaid: 320.0,
       change: 0,
       status: 'COMPLETED',
+      notes: 'Garantia legal de 90 dias contra defeito de fabricação. Retirada no balcão da loja.',
       createdAt: new Date().toISOString(),
     };
     setReceiptSale(demoSale);

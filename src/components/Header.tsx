@@ -5,14 +5,12 @@ import {
   ChevronDown,
   Cloud,
   Layers,
-  LogOut,
   Menu,
   Moon,
   Plus,
   RefreshCw,
   Shield,
   Sun,
-  UserCheck,
   Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -27,9 +25,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
     notifications,
     lastSyncTime,
     isCloudSyncing,
-    logout,
     setIsQuickActionOpen,
-    setIsLoginModalOpen,
     setActiveModule,
     markNotificationAsRead,
     clearNotifications,
@@ -225,47 +221,22 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
             <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 shadow-lg ring-1 ring-black/5 z-50">
               <div className="border-b border-slate-100 dark:border-slate-700/60 p-2.5">
                 <p className="text-xs font-bold text-slate-900 dark:text-white">{currentUser.name}</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{currentUser.email || 'Conta em Nuvem'}</p>
-                <span className={`mt-2 inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${getRoleBadge(currentUser.role)}`}>
+                <span className={`mt-1.5 inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${getRoleBadge(currentUser.role)}`}>
                   Nível: {currentUser.role}
                 </span>
               </div>
 
               <div className="py-1 space-y-0.5">
                 <button
-                  id="btn-switch-user"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    setIsLoginModalOpen(true);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700"
-                >
-                  <UserCheck className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                  Detalhes da Conta
-                </button>
-
-                <button
                   id="btn-open-settings"
                   onClick={() => {
                     setIsUserMenuOpen(false);
                     setActiveModule('settings');
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700 cursor-pointer"
                 >
                   <Shield className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                  Configurações Gerais
-                </button>
-
-                <button
-                  id="btn-logout"
-                  onClick={async () => {
-                    setIsUserMenuOpen(false);
-                    await logout();
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Sair da Conta
+                  Configurações do Sistema
                 </button>
               </div>
             </div>

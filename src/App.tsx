@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Cloud, Loader2 } from 'lucide-react';
-import { AuthScreen } from './components/AuthScreen';
+import { BarChart3, Loader2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { LoginModal } from './components/LoginModal';
 import { QuickActionModal } from './components/QuickActionModal';
@@ -17,31 +16,26 @@ import { SalesHistoryModule } from './modules/SalesHistoryModule';
 import { SettingsModule } from './modules/SettingsModule';
 
 const MainContent: React.FC = () => {
-  const { activeModule, authUser, isAuthLoading } = useApp();
+  const { activeModule, isAuthLoading, authUser } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // 1. Loading state while checking Firebase session
-  if (isAuthLoading) {
+  // Brief initial loading screen if authentication check is pending
+  if (isAuthLoading && !authUser) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#F8FAFC] text-slate-800">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 dark:bg-indigo-600 text-white shadow-lg animate-pulse">
           <BarChart3 className="h-6 w-6 stroke-[2.2]" />
         </div>
-        <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-600">
-          <Loader2 className="h-4 w-4 text-slate-900" />
-          <span>Iniciando sessão segura em nuvem...</span>
+        <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
+          <Loader2 className="h-4 w-4 text-slate-900 dark:text-indigo-400 animate-spin" />
+          <span>Iniciando sistema comercial...</span>
         </div>
       </div>
     );
   }
 
-  // 2. If user is not authenticated, show modern Auth Screen
-  if (!authUser) {
-    return <AuthScreen />;
-  }
-
-  // 3. User authenticated - render full application modules
+  // Render full application modules directly (no login wall)
   const renderModule = () => {
     switch (activeModule) {
       case 'dashboard':

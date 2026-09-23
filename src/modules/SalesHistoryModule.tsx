@@ -11,12 +11,14 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  Edit3,
   Eye,
   FileSpreadsheet,
   FileText,
   Filter,
   Hammer,
   Layers,
+  MessageSquare,
   Plus,
   PlusCircle,
   Printer,
@@ -586,6 +588,15 @@ export const SalesHistoryModule: React.FC = () => {
                             <span>Categoria: {row.categoryOrCustomer}</span>
                           )}
                         </div>
+                        {row.rawSale?.notes && (
+                          <div
+                            className="mt-0.5 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium truncate flex items-center gap-1"
+                            title={`Observações: ${row.rawSale.notes}`}
+                          >
+                            <MessageSquare className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">{row.rawSale.notes}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Pagamento */}
@@ -795,6 +806,30 @@ export const SalesHistoryModule: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Observações do Recibo */}
+              <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 text-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-[11px] uppercase tracking-wider text-indigo-950 dark:text-indigo-300 flex items-center gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    Observações do Recibo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptSale(selectedSaleDetail);
+                      setSelectedSaleDetail(null);
+                    }}
+                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    {selectedSaleDetail.notes ? 'Editar no Recibo' : '+ Adicionar Observação'}
+                  </button>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 italic whitespace-pre-wrap">
+                  {selectedSaleDetail.notes || 'Nenhuma observação informada no recibo desta venda.'}
+                </p>
               </div>
 
               {/* Totals */}
