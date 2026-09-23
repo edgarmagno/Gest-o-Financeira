@@ -186,14 +186,14 @@ export const DEFAULT_SALES_CHANNELS: string[] = [
 ];
 
 export const DEFAULT_COMPANY: CompanySettings = {
-  tradeName: 'Edgar Magno Comércio & Personalizados',
-  corporateName: 'Edgar Magno LTDA',
-  cnpj: '',
-  phone: '',
+  tradeName: 'Loot do Geek',
+  corporateName: '60.642.242 Edgar Magno Alves',
+  cnpj: '60.642.242/0001-00',
+  phone: '92988278251',
   email: 'edgar.magno@live.com',
-  address: '',
-  city: '',
-  state: 'SP',
+  address: 'Rua Rio Branco, 741',
+  city: 'Manaus',
+  state: 'AM',
   zipCode: '',
   receiptFooterMessage: 'Obrigado pela preferência! Volte sempre.',
   taxRatePercent: 0,

@@ -316,6 +316,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lastSyncTime, setLastSyncTime] = useState<string>('Online');
   const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
 
+  // Master user UIDs that hold Edgar Magno's real saved records
+  const MASTER_USER_IDS = ['ZuLpSIZPfcNJEzXHBmJ8uDr2IdN2', 'z1DQDv2IftRjT841Z797tTPsTq73'];
+
+  // Helper to replicate Edgar's saved cloud data (Loot do Geek) to any active account
+  const syncUserDataFromSources = async (targetUid: string) => {
+    for (const sourceUid of MASTER_USER_IDS) {
+      if (sourceUid === targetUid) continue;
+      try {
+        const srcProdSnap = await getDocs(collection(db, 'users', sourceUid, 'products'));
+        if (!srcProdSnap.empty) {
+          // Copy real products
+          for (const pDoc of srcProdSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'products', pDoc.id), pDoc.data(), { merge: true });
+          }
+          // Copy real customers
+          const srcCustSnap = await getDocs(collection(db, 'users', sourceUid, 'customers'));
+          for (const cDoc of srcCustSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'customers', cDoc.id), cDoc.data(), { merge: true });
+          }
+          // Copy real sales
+          const srcSaleSnap = await getDocs(collection(db, 'users', sourceUid, 'sales'));
+          for (const sDoc of srcSaleSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'sales', sDoc.id), sDoc.data(), { merge: true });
+          }
+          // Copy real quotes
+          const srcQuoteSnap = await getDocs(collection(db, 'users', sourceUid, 'quotes'));
+          for (const qDoc of srcQuoteSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'quotes', qDoc.id), qDoc.data(), { merge: true });
+          }
+          // Copy real production orders
+          const srcPoSnap = await getDocs(collection(db, 'users', sourceUid, 'production_orders'));
+          for (const poDoc of srcPoSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'production_orders', poDoc.id), poDoc.data(), { merge: true });
+          }
+          // Copy real transactions
+          const srcTxSnap = await getDocs(collection(db, 'users', sourceUid, 'transactions'));
+          for (const txDoc of srcTxSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'transactions', txDoc.id), txDoc.data(), { merge: true });
+          }
+          // Copy real stock movements
+          const srcMovSnap = await getDocs(collection(db, 'users', sourceUid, 'movements'));
+          for (const mDoc of srcMovSnap.docs) {
+            await setDoc(doc(db, 'users', targetUid, 'movements', mDoc.id), mDoc.data(), { merge: true });
+          }
+          // Copy company settings
+          const srcCompSnap = await getDoc(doc(db, 'users', sourceUid, 'settings', 'company'));
+          if (srcCompSnap.exists()) {
+            await setDoc(doc(db, 'users', targetUid, 'settings', 'company'), srcCompSnap.data(), { merge: true });
+          }
+          break;
+        }
+      } catch (err) {
+        console.warn(`Syncing from ${sourceUid} notice:`, err);
+      }
+    }
+  };
+
+  // Helper to mirror writes to both master IDs so data is never lost or desynced
+  const mirrorDocWrite = async (sub: string, docId: string, data: any, isDelete = false) => {
+    for (const mid of MASTER_USER_IDS) {
+      try {
+        const targetDocRef = doc(db, 'users', mid, sub, docId);
+        if (isDelete) {
+          await deleteDoc(targetDocRef);
+        } else {
+          await setDoc(targetDocRef, cleanFirestoreData(data), { merge: true });
+        }
+      } catch {
+        // Background mirror
+      }
+    }
+  };
+
   // 1. Listen to Firebase Auth state
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
@@ -394,37 +467,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             await setDoc(companyDocRef, cleanFirestoreData(initialCompanySettings));
           }
 
-          // Check if user has products; if empty, initialize with catalog items
+          // Ensure user has products; if empty, replicate from saved cloud records
           try {
             const pCheck = await getDocs(collection(db, 'users', fbUser.uid, 'products'));
             if (pCheck.empty) {
-              for (let i = 0; i < DEMO_PRODUCTS.length; i++) {
-                const p = DEMO_PRODUCTS[i];
-                const pId = `demo-prod-${i + 1}`;
-                await setDoc(
-                  doc(db, 'users', fbUser.uid, 'products', pId),
-                  cleanFirestoreData({ ...p, id: pId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-                );
-              }
-              for (let i = 0; i < DEMO_CUSTOMERS.length; i++) {
-                const c = DEMO_CUSTOMERS[i];
-                const cId = `demo-cust-${i + 1}`;
-                await setDoc(
-                  doc(db, 'users', fbUser.uid, 'customers', cId),
-                  cleanFirestoreData({ ...c, id: cId, createdAt: new Date().toISOString(), totalSpent: 0, ordersCount: 0 })
-                );
-              }
-              for (let i = 0; i < DEMO_PRODUCTION_ORDERS.length; i++) {
-                const po = DEMO_PRODUCTION_ORDERS[i];
-                const poId = `demo-po-${i + 1}`;
-                await setDoc(
-                  doc(db, 'users', fbUser.uid, 'production_orders', poId),
-                  cleanFirestoreData({ ...po, id: poId, createdAt: new Date().toISOString() })
-                );
-              }
+              await syncUserDataFromSources(fbUser.uid);
             }
-          } catch (seedErr) {
-            console.warn('Initial data seeding check:', seedErr);
+          } catch (syncErr) {
+            console.warn('Real user data sync notice:', syncErr);
           }
         } catch (err) {
           console.error('Error fetching user profile:', err);
@@ -738,6 +788,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Force-fetch all collections directly from Firestore
       const uid = auth.currentUser.uid;
 
+      // If user has no products, sync from master sources first
+      const testProdCheck = await getDocs(collection(db, 'users', uid, 'products')).catch(() => null);
+      if (!testProdCheck || testProdCheck.empty) {
+        await syncUserDataFromSources(uid);
+      }
+
       // 1. Products
       const pSnap = await getDocsFromServer(collection(db, 'users', uid, 'products')).catch(() =>
         getDocs(collection(db, 'users', uid, 'products'))
@@ -876,31 +932,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             await setDoc(userDocRef, cleanFirestoreData(newUser));
             setCurrentUser(newUser);
 
-            // Populate catalog into Firestore
-            for (let i = 0; i < DEMO_PRODUCTS.length; i++) {
-              const p = DEMO_PRODUCTS[i];
-              const pId = `demo-prod-${i + 1}`;
-              await setDoc(
-                doc(db, 'users', cred.user.uid, 'products', pId),
-                cleanFirestoreData({ ...p, id: pId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-              );
-            }
-            for (let i = 0; i < DEMO_CUSTOMERS.length; i++) {
-              const c = DEMO_CUSTOMERS[i];
-              const cId = `demo-cust-${i + 1}`;
-              await setDoc(
-                doc(db, 'users', cred.user.uid, 'customers', cId),
-                cleanFirestoreData({ ...c, id: cId, createdAt: new Date().toISOString(), totalSpent: 0, ordersCount: 0 })
-              );
-            }
-            for (let i = 0; i < DEMO_PRODUCTION_ORDERS.length; i++) {
-              const po = DEMO_PRODUCTION_ORDERS[i];
-              const poId = `demo-po-${i + 1}`;
-              await setDoc(
-                doc(db, 'users', cred.user.uid, 'production_orders', poId),
-                cleanFirestoreData({ ...po, id: poId, createdAt: new Date().toISOString() })
-              );
-            }
+            // Populate real user catalog and records into Firestore
+            await syncUserDataFromSources(cred.user.uid);
             return;
           }
         } catch (createErr: any) {
@@ -1003,6 +1036,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const docRef = doc(db, 'users', authUser.uid, 'products', newId);
     await setDoc(docRef, cleanFirestoreData(newProduct));
+    mirrorDocWrite('products', newId, newProduct);
 
     // Initial stock movement if stock > 0
     if (newProduct.stock > 0) {
@@ -1021,6 +1055,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       const movDocRef = doc(db, 'users', authUser.uid, 'movements', movementId);
       await setDoc(movDocRef, cleanFirestoreData(movement));
+      mirrorDocWrite('movements', movementId, movement);
     }
 
     return newProduct;
@@ -1029,13 +1064,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProduct = async (id: string, updated: Partial<Product>) => {
     if (!authUser) return;
     const docRef = doc(db, 'users', authUser.uid, 'products', id);
-    await updateDoc(docRef, cleanFirestoreData({ ...updated, updatedAt: new Date().toISOString() }));
+    const dataToSave = cleanFirestoreData({ ...updated, updatedAt: new Date().toISOString() });
+    await updateDoc(docRef, dataToSave);
+    mirrorDocWrite('products', id, dataToSave);
   };
 
   const deleteProduct = async (id: string) => {
     if (!authUser) return;
     const docRef = doc(db, 'users', authUser.uid, 'products', id);
     await deleteDoc(docRef);
+    mirrorDocWrite('products', id, {}, true);
   };
 
   const adjustStock = async (
@@ -1099,6 +1137,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 1. Save Sale to Firestore (with undefineds safely stripped)
     const saleRef = doc(db, 'users', authUser.uid, 'sales', saleId);
     await setDoc(saleRef, cleanFirestoreData(newSale));
+    mirrorDocWrite('sales', saleId, newSale);
 
     // 2. Deduct product stock and log movements
     for (const item of newSale.items || []) {
@@ -1153,6 +1192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const txRef = doc(db, 'users', authUser.uid, 'transactions', txId);
     await setDoc(txRef, cleanFirestoreData(newTx));
+    mirrorDocWrite('transactions', txId, newTx);
 
     return newSale;
   };
@@ -1164,10 +1204,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 1. Mark sale as CANCELLED
     const saleRef = doc(db, 'users', authUser.uid, 'sales', saleId);
-    await updateDoc(saleRef, cleanFirestoreData({
-      status: 'CANCELLED',
+    const cancelPayload = {
+      status: 'CANCELLED' as const,
       notes: reason || saleToCancel.notes || 'Venda Cancelada',
-    }));
+    };
+    await updateDoc(saleRef, cleanFirestoreData(cancelPayload));
+    mirrorDocWrite('sales', saleId, cancelPayload);
 
     // 2. Restore products stock
     for (const item of saleToCancel.items || []) {
@@ -1235,6 +1277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const quoteRef = doc(db, 'users', authUser.uid, 'quotes', quoteId);
     await setDoc(quoteRef, cleanFirestoreData(newQuote));
+    mirrorDocWrite('quotes', quoteId, newQuote);
     return newQuote;
   };
 
@@ -1242,12 +1285,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!authUser) return;
     const quoteRef = doc(db, 'users', authUser.uid, 'quotes', id);
     await updateDoc(quoteRef, cleanFirestoreData({ status }));
+    mirrorDocWrite('quotes', id, { status });
   };
 
   const updateQuoteNotes = async (id: string, notes: string) => {
     if (!authUser) return;
     const quoteRef = doc(db, 'users', authUser.uid, 'quotes', id);
     await updateDoc(quoteRef, cleanFirestoreData({ notes: notes.trim() }));
+    mirrorDocWrite('quotes', id, { notes: notes.trim() });
     setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, notes: notes.trim() } : q)));
     setReceiptQuote((prev) => (prev && prev.id === id ? { ...prev, notes: notes.trim() } : prev));
   };
@@ -1273,10 +1318,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const quoteRef = doc(db, 'users', authUser.uid, 'quotes', quoteId);
-    await updateDoc(quoteRef, cleanFirestoreData({
-      status: 'CONVERTIDO',
+    const convertedData = {
+      status: 'CONVERTIDO' as const,
       convertedSaleId: newSale.id,
-    }));
+    };
+    await updateDoc(quoteRef, cleanFirestoreData(convertedData));
+    mirrorDocWrite('quotes', quoteId, convertedData);
 
     return newSale;
   };
@@ -1285,6 +1332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!authUser) return;
     const quoteRef = doc(db, 'users', authUser.uid, 'quotes', id);
     await deleteDoc(quoteRef);
+    mirrorDocWrite('quotes', id, {}, true);
   };
 
   // Production Orders Actions
@@ -1319,6 +1367,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const docRef = doc(db, 'users', authUser.uid, 'production_orders', orderId);
     await setDoc(docRef, cleanFirestoreData(newOrder));
+    mirrorDocWrite('production_orders', orderId, newOrder);
     return newOrder;
   };
 
@@ -1329,7 +1378,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...partial,
       updatedAt: new Date().toISOString(),
     };
-    await updateDoc(docRef, cleanFirestoreData(updated));
+    const dataToSave = cleanFirestoreData(updated);
+    await updateDoc(docRef, dataToSave);
+    mirrorDocWrite('production_orders', id, dataToSave);
   };
 
   const updateProductionStatus = async (
@@ -1372,7 +1423,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    await updateDoc(docRef, cleanFirestoreData(payload));
+    const dataToSave = cleanFirestoreData(payload);
+    await updateDoc(docRef, dataToSave);
+    mirrorDocWrite('production_orders', id, dataToSave);
   };
 
   const deductProductionMaterials = async (id: string): Promise<boolean> => {
@@ -1424,6 +1477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!authUser) return;
     const docRef = doc(db, 'users', authUser.uid, 'production_orders', id);
     await deleteDoc(docRef);
+    mirrorDocWrite('production_orders', id, {}, true);
   };
 
   const startProductionFromQuote = (quote: Quote) => {
@@ -1486,19 +1540,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const custRef = doc(db, 'users', authUser.uid, 'customers', custId);
     await setDoc(custRef, cleanFirestoreData(newCust));
+    mirrorDocWrite('customers', custId, newCust);
     return newCust;
   };
 
   const updateCustomer = async (id: string, updated: Partial<Customer>) => {
     if (!authUser) return;
     const custRef = doc(db, 'users', authUser.uid, 'customers', id);
-    await updateDoc(custRef, cleanFirestoreData(updated));
+    const dataToSave = cleanFirestoreData(updated);
+    await updateDoc(custRef, dataToSave);
+    mirrorDocWrite('customers', id, dataToSave);
   };
 
   const deleteCustomer = async (id: string) => {
     if (!authUser) return;
     const custRef = doc(db, 'users', authUser.uid, 'customers', id);
     await deleteDoc(custRef);
+    mirrorDocWrite('customers', id, {}, true);
   };
 
   // Finance Actions
@@ -1512,18 +1570,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const txRef = doc(db, 'users', authUser.uid, 'transactions', txId);
     await setDoc(txRef, cleanFirestoreData(newTx));
+    mirrorDocWrite('transactions', txId, newTx);
   };
 
   const updateTransaction = async (id: string, updated: Partial<FinancialTransaction>) => {
     if (!authUser) return;
     const txRef = doc(db, 'users', authUser.uid, 'transactions', id);
-    await updateDoc(txRef, cleanFirestoreData(updated));
+    const dataToSave = cleanFirestoreData(updated);
+    await updateDoc(txRef, dataToSave);
+    mirrorDocWrite('transactions', id, dataToSave);
   };
 
   const deleteTransaction = async (id: string) => {
     if (!authUser) return;
     const txRef = doc(db, 'users', authUser.uid, 'transactions', id);
     await deleteDoc(txRef);
+    mirrorDocWrite('transactions', id, {}, true);
   };
 
   const updateCompany = async (settings: Partial<CompanySettings>) => {
@@ -1536,6 +1598,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!authUser) return;
     const compRef = doc(db, 'users', authUser.uid, 'settings', 'company');
     await setDoc(compRef, cleanFirestoreData(updated), { merge: true });
+    mirrorDocWrite('settings', 'company', updated);
   };
 
   // Notification management
